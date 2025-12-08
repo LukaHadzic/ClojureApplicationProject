@@ -36,6 +36,11 @@
                  ["ALTER TABLE testTable
                  ADD COLUMN idT INT"]))
 
+(defn get-table-column [table_name col_name]
+  (jdbc/execute! dbSpecs
+                 [(str "SELECT " col_name " FROM " table_name)]))
+
+
 ;(defn insertIntoTestTable []
 ;
 ;  (let [rows [[1 3 2 1]
