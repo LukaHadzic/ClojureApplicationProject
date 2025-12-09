@@ -13,6 +13,11 @@
   (> (:skill player) (rand-int 101))
   )
 
+(defn show-team-players [team]
+  (println (map (fn [plName] (str "Igrac: " plName)) (map (fn [el]
+         (:name el)) (:players team))
+  )
+  ))
 
 (defn -main
   "I don't do a whole lot ... yet."
@@ -25,10 +30,18 @@
                                         (make-player "Alves" 86)
                                         (make-player "Villa" 93)])
 
+
+
+        ;(make-team "Barcelona" [(make-player "Messi" 97) (make-player "Alves" 86) (make-player "Villa" 93)])
+
         el_classico (make-match team_h team_a)]
 
   (println team_h)
   (println team_a)
-  (println el_classico)))
+  (println el_classico)
+  (println "Ispis tima preko metode: ")
+  (show-team-players team_h))
+
+  )
 
 ;(println (db/get-table-column "testtable" "cntVal")))
