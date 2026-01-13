@@ -1,93 +1,7 @@
 (ns clojure-application-project.core
-  (:gen-class) (:require [clojure-application-project.db :as db]))
-
-(defn make-player  [name skill] {:name name :skill skill})
-
-(defn make-team [name players-and-positions] {:name name :players players-and-positions})
-
-(defn goal? [player]
-  (> (:skill player) (rand-int 101)))
-
-(defn make-match
-  [home away]
-  (let [state {:home {:team home :goals 0}
-               :away {:team away :goals 0}
-               :minute 0
-               :possession :home
-               :zone :midfield
-               :ball-holder {}
-               :log {:home [] :away []}}
-        state (assoc state :ball-holder (rand-nth (get-in state [(:possession state) :team :players :attack])))]
-    state))
-
-(defn opposite-team [team]
-  (if (= team :home) :away :home))
-
-(defn new-ball-holder
-  [state]
-  (rand-nth (get-in state [(opposite-team state) :team :players (:zone state)])))
-
-(defn pass
-  [state]
-  (-> state
-      (assoc :zone (rand-nth [:midfield :attack :defense]))
-      ;Dodati new ball holder ako pas prodje
-      (update-in [:log (:possession state)] conj :pass)))
-
-(defn duel
-  [state]
-  (if (< (:skill (:ball-holder state)) (rand-int 101))
-    (-> state
-        (update-in [:log (:possession state)] conj :duel-won)
-        (update-in [:log (opposite-team (:possession state))] conj :duel-lost))
-    (let [new-possession (opposite-team (:possession state))
-          players (get-in state [new-possession :team :players (:zone state)])
-          new-ball-holder (rand-nth players)]
-      (-> state
-          (update-in [:log (:possession state)] conj :duel-lost)
-          (update-in [:log (opposite-team (:possession state))] conj :duel-won)
-          (assoc :possession new-possession :ball-holder new-ball-holder)))))
-
-(defn offside
-  [state]
-  (-> state
-      (assoc :ball-holder (new-ball-holder state))
-      (assoc :zone :offside)
-      (update :possession opposite-team)
-      (update-in [:log (:possession state)] conj :offside)))
-
-(defn finish-shot
-  [state event zone is-goal]
-  (let [team (:possession state)]
-    (-> state
-        (update-in [:log team] conj event)
-        (update-in [team :goals] + is-goal)
-        (assoc :zone zone)
-        (assoc :ball-holder (new-ball-holder state))
-        (update :possession opposite-team))))
-
-(defn goal [state]
-  (finish-shot state :goal :midfield 1))
-
-(defn miss [state]
-  (finish-shot state :miss :defense 0))
-
-(defn shot
-  [state]
-  (if (goal? (:ball-holder state))
-    (goal state)
-    (miss state)))
-
-(def zone-actions-controller
-  {:defense [pass duel]
-   :midfield [pass duel]
-   :attack [pass duel shot offside]
-   :offside [pass]})
-
-(defn show-team-players [team]
-  (println (map (fn [plName] (str "Igrac: " plName)) (map (fn [el]
-         (:name el)) (:players team))
-  )))
+  (:gen-class) (:require [clojure-application-project.db :as db]
+                         [clojure-application-project.events :as events]
+                         [clojure-application-project.helpers :as helpers]))
 
 ;(defn simulate-minute
   ;Minut utakmice kada neko ima sansu za gol
@@ -103,35 +17,35 @@
 
 (defn simulate-minute
   [match]
-  (let [actions-allowed (get zone-actions-controller (:zone match))
+  (let [actions-allowed (get events/zone-actions-controller (:zone match))
         event (rand-nth actions-allowed)]
     (event match)))
 
-(def el-classico (make-match (make-team "Real Madrid"
-                                        {:goalkeeper [(make-player "Iker Casillas" 86)]
-                                         :defense [(make-player "Dani Carvajal" 83)
-                                                   (make-player "Pepe" 83)
-                                                   (make-player "Sergio Ramos" 89)
-                                                   (make-player "Marcelo" 85)]
-                                         :midfield [(make-player "Sami Khedira" 86)
-                                                    (make-player "Luka Modric" 88)
-                                                    (make-player "Angel Di Maria" 88)]
-                                         :attack [(make-player "Cristiano Ronaldo" 92)
-                                                  (make-player "Karim Benzema" 87)
-                                                  (make-player "Gareth Bale" 91)]})
+(def el-classico (helpers/make-match (helpers/make-team "Real Madrid"
+                                        {:goalkeeper [(helpers/make-player "Iker Casillas" 86)]
+                                         :defense [(helpers/make-player "Dani Carvajal" 83)
+                                                   (helpers/make-player "Pepe" 83)
+                                                   (helpers/make-player "Sergio Ramos" 89)
+                                                   (helpers/make-player "Marcelo" 85)]
+                                         :midfield [(helpers/make-player "Sami Khedira" 86)
+                                                    (helpers/make-player "Luka Modric" 88)
+                                                    (helpers/make-player "Angel Di Maria" 88)]
+                                         :attack [(helpers/make-player "Cristiano Ronaldo" 92)
+                                                  (helpers/make-player "Karim Benzema" 87)
+                                                  (helpers/make-player "Gareth Bale" 91)]})
 
-                             (make-team "Barcelona"
-                                        {:goalkeeper [(make-player "Victor Valdes" 87)]
-                                         :defense [(make-player "Dani Alves" 85)
-                                                   (make-player "Gerard Pique" 87)
-                                                   (make-player "Javier Mascherano" 85)
-                                                   (make-player "Jordi Alba" 83)]
-                                         :midfield [(make-player "Sergio Busquets" 87)
-                                                    (make-player "Xavi" 90)
-                                                    (make-player "Andres Iniesta" 91)]
-                                         :attack [(make-player "Lionel Messi" 94)
-                                                  (make-player "Pedro" 85)
-                                                  (make-player "Neymar" 87)]})))
+                             (helpers/make-team "Barcelona"
+                                        {:goalkeeper [(helpers/make-player "Victor Valdes" 87)]
+                                         :defense [(helpers/make-player "Dani Alves" 85)
+                                                   (helpers/make-player "Gerard Pique" 87)
+                                                   (helpers/make-player "Javier Mascherano" 85)
+                                                   (helpers/make-player "Jordi Alba" 83)]
+                                         :midfield [(helpers/make-player "Sergio Busquets" 87)
+                                                    (helpers/make-player "Xavi" 90)
+                                                    (helpers/make-player "Andres Iniesta" 91)]
+                                         :attack [(helpers/make-player "Lionel Messi" 94)
+                                                  (helpers/make-player "Pedro" 85)
+                                                  (helpers/make-player "Neymar" 87)]})))
 
 ;(simulate-minute el-classico)
 
