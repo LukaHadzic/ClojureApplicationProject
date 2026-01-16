@@ -104,7 +104,7 @@
     (is (= :away (helpers/opposite-team :home)))
     (is (= :home (helpers/opposite-team :away)))))
 
-(deftest new-ball-holder-test
+(deftest new-ball-holder-2-test
   (testing "Pick and return new ball holder"
     (with-redefs [rand-nth (fn [coll] (first coll))]
       (is (= {:name "Dani Alves", :skill 85}
@@ -125,3 +125,31 @@
     (with-redefs [rand-int (fn [_] 90)]
       (is (= true (helpers/goal? {:name "Lionel Messi", :skill 94})))
       (is (= false (helpers/goal?  {:name "Neymar", :skill 87}))))))
+
+(deftest pass?-test
+  (testing "Is pass logic good"
+    (with-redefs [rand-int (fn [_] 90)]
+      (is (= true (helpers/pass? {:name "Lionel Messi", :skill 94})))
+      (is (= false (helpers/pass?  {:name "Neymar", :skill 87}))))))
+
+(deftest new-ball-holder-test
+  (testing "Returns new ball holder after passing - must be
+  different player than current ball-holder, cannot be the same"
+    (with-redefs [rand-nth (fn [coll] (second coll))]
+      (is (not= {:name "Karim Benzema", :skill 87}
+                (helpers/new-ball-holder match-exmpl-2 :home :attack))))))
+
+(deftest rand-zone-test
+  (testing "Returns rand-zone from list of zones in rand-zone"
+    (with-redefs [rand-nth (fn [coll] (second coll))]
+      (is (= :midfield (helpers/rand-zone))))))
+
+(def opp-zone-match-1 {:zone :attack})
+(def opp-zone-match-2 {:zone :midfield})
+(def opp-zone-match-3 {:zone :defense})
+
+(deftest opposite-zone-test
+  (testing "Returns zone from opposite-zone-map"
+    (is (= :defense (helpers/opposite-zone opp-zone-match-1)))
+    (is (= :midfield (helpers/opposite-zone opp-zone-match-2)))
+    (is (= :attack (helpers/opposite-zone opp-zone-match-3)))))

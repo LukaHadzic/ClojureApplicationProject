@@ -19,7 +19,16 @@
   [match]
   (let [actions-allowed (get events/zone-actions-controller (:zone match))
         event (rand-nth actions-allowed)]
-    (event match)))
+    (do
+      (println (str "Minute: " (:minute match)))
+      (println (str "Ball holder: " (:ball-holder match)))
+      (println (str "Possession: " (:possession match)))
+      (println (str "Result: "
+                    "home: " (:goals (:home match))
+                    " away: " (:goals (:away match))))
+      (println (str (last ((:possession match) (:log match)))))
+      (event match))))
+    ;(event match)))
 
 (def el-classico (helpers/make-match (helpers/make-team "Real Madrid"
                                         {:goalkeeper [(helpers/make-player "Iker Casillas" 86)]
@@ -47,7 +56,7 @@
                                                   (helpers/make-player "Pedro" 85)
                                                   (helpers/make-player "Neymar" 87)]})))
 
-;(simulate-minute el-classico)
+(simulate-minute el-classico)
 
 (defn simulate-match
   [match]
@@ -59,27 +68,42 @@
 
 (simulate-match el-classico)
 
+;Napraviti -> out, goal-out, foul, penalty
+
+;Ubaciti golmana - odbrana suta
+
+;Ubaciti golmana u igru, pasevi i dueli
+
+;poasonova raspodela
+
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
-  (let [team_h (make-team "Real Madrid" [(make-player "Ronaldo" 97)
-                                        (make-player "Ramos" 86)
-                                        (make-player "Alonso" 93)])
+  (let [el-classico (helpers/make-match (helpers/make-team "Real Madrid"
+                                                          {:goalkeeper [(helpers/make-player "Iker Casillas" 86)]
+                                                           :defense [(helpers/make-player "Dani Carvajal" 83)
+                                                                     (helpers/make-player "Pepe" 83)
+                                                                     (helpers/make-player "Sergio Ramos" 89)
+                                                                     (helpers/make-player "Marcelo" 85)]
+                                                           :midfield [(helpers/make-player "Sami Khedira" 86)
+                                                                      (helpers/make-player "Luka Modric" 88)
+                                                                      (helpers/make-player "Angel Di Maria" 88)]
+                                                           :attack [(helpers/make-player "Cristiano Ronaldo" 92)
+                                                                    (helpers/make-player "Karim Benzema" 87)
+                                                                    (helpers/make-player "Gareth Bale" 91)]})
 
-        team_a (make-team "Barcelona" [(make-player "Messi" 97)
-                                        (make-player "Alves" 86)
-                                        (make-player "Villa" 93)])
-
-
-
-        ;(make-team "Barcelona" [(make-player "Messi" 97) (make-player "Alves" 86) (make-player "Villa" 93)])
-
-        el_classico (make-match team_h team_a)]
-
-  (println team_h)
-  (println team_a)
-  (println el_classico)
-  (println "Ispis tima preko metode: ")
-  (show-team-players team_h)))
+                                       (helpers/make-team "Barcelona"
+                                                          {:goalkeeper [(helpers/make-player "Victor Valdes" 87)]
+                                                           :defense [(helpers/make-player "Dani Alves" 85)
+                                                                     (helpers/make-player "Gerard Pique" 87)
+                                                                     (helpers/make-player "Javier Mascherano" 85)
+                                                                     (helpers/make-player "Jordi Alba" 83)]
+                                                           :midfield [(helpers/make-player "Sergio Busquets" 87)
+                                                                      (helpers/make-player "Xavi" 90)
+                                                                      (helpers/make-player "Andres Iniesta" 91)]
+                                                           :attack [(helpers/make-player "Lionel Messi" 94)
+                                                                    (helpers/make-player "Pedro" 85)
+                                                                    (helpers/make-player "Neymar" 87)]}))]
+    (simulate-match el-classico)))
 
 ;(println (db/get-table-column "testtable" "cntVal")))
