@@ -2,7 +2,10 @@
 
 (defn make-player
   [id name skill]
-  {:id id :name name :skill skill :passes 0 :good-passes 0 :shots 0 :goals 0 :duels 0 :duels-won 0 :offsides 0})
+  {:id id :name name :skill skill
+   :goal-keeping 0 :defense 0 :passing 0 :strength 0 :finishing 0 :attack 0
+   :saves 0 :passes 0 :good-passes 0
+   :shots 0 :shots-on-goal 0 :goals 0 :duels 0 :duels-won 0 :offsides 0})
 
 (defn make-team
   [name players-and-positions]
@@ -15,6 +18,7 @@
                :minute 0
                :possession :home
                :zone :resume
+               :phase :play
                :ball-holder {}
                :log {:home [] :away []}}
         state (assoc state :ball-holder (rand-nth (get-in state [(:possession state) :team :players :attack])))]
@@ -37,7 +41,8 @@
   (if (= team :home) :away :home))
 
 (def opposite-zone-map
-  {:defense :attack
+  {:goalkeeper :attack
+   :defense :attack
    :attack :defense
    :midfield :midfield})
 
@@ -52,12 +57,12 @@
   (get next-zone-map curr-zone))
 
 (defn opposite-zone
-  [state]
-  ((:zone state) opposite-zone-map))
+  [zone]
+  (zone opposite-zone-map))
 
 (defn rand-zone
   []
-  (rand-nth [:defense :midfield :attack]))
+  (rand-nth [:goalkeeper :defense :midfield :attack]))
 ;
 ;(defn new-ball-holder
 ;  [state]
@@ -65,7 +70,9 @@
 
 (defn rand-opposite-player
   [state]
-  (rand-nth (get-in state [(opposite-team (:possession state))  :team :players (opposite-zone state)])))
+  (let [curr-team (:possession state)
+        curr-zone (:zone state)]
+  (rand-nth (get-in state [(opposite-team curr-team) :team :players (opposite-zone curr-zone)]))))
 
 (defn new-ball-holder
   "Does not allow player to pass himself"
@@ -88,13 +95,88 @@
   [player]
   (> (:skill player) (rand-int 101)))
 
+(def pass-possibilities
+  {:goalkeeper {:defense 0.7
+                :midfield 0.2
+                :attack 0.1}
+   :defense {:goalkeeper 0.25
+             :defense 0.30
+             :midfield 0.35
+             :attack 0.1}
+   :midfield {:goalkeeper 0.2
+              :defense 0.3
+              :midfield 0.3
+              :attack 0.2}
+   :attack {:goalkeeper 0.02
+            :defense 0.08
+            :midfield 0.45
+            :attack 0.45}})
+
+(def good-pass-possibilities
+  {:goalkeeper {:defense 0.9
+                :midfield 0.75
+                :attack 0.2}
+   :defense {:goalkeeper 0.95
+             :defense 0.9
+             :midfield 0.75
+             :attack 0.2}
+   :midfield {:goalkeeper 0.9
+              :defense 0.9
+              :midfield 0.7
+              :attack 0.4}
+   :attack {:goalkeeper 0.7
+            :defense 0.5
+            :midfield 0.6
+            :attack 0.33}})
+
+(defn choose-pass-end-zone
+  [from-zone]
+  (let [targets (from-zone pass-possibilities)
+        r (rand)]
+    (loop [acc 0
+           [[zone prob] & rest] targets]
+      (let [new-acc (+ acc prob)]
+        (if (< r new-acc)
+          zone
+          (recur new-acc rest))))))
+
 (defn pass?
-  [player]
-  (> (:skill player) (rand-int 101)))
+  [zone-begin zone-end]
+  (let [r (rand)
+        prob (get-in good-pass-possibilities [zone-begin zone-end])]
+    (< r prob)))
 
 (defn offside?
   []
-  (>= (rand-int 5) 4))
+  (>= (rand-int 10) 9))
+
+(defn out?
+  [ball-holder]
+  (let [r (rand-int 100)
+        pass-skill (:passing ball-holder)]
+    (> r pass-skill)))
+
+(defn closer-value-to-first?
+  [value-1 value-2]
+  (let [total (+ value-1 value-2)
+        r (rand-int total)]
+    (if (< r value-1)
+      true
+      false)))
+
+(defn inc-events
+  [state team player-id events]
+  (update-in state [team :team :players]
+             (fn [player-pos-map]
+               (update-vals player-pos-map
+                            (fn [players]
+                              (map (fn [p]
+                                     (if (= (:id p) player-id)
+                                       (reduce (fn [updated-p event]
+                                                 (update updated-p event inc))
+                                               p events)
+                                       p))
+                                   players))))))
 
 (defn count-event
   [team event]

@@ -27,7 +27,10 @@
     ;                "home: " (:goals (:home match))
     ;                " away: " (:goals (:away match))))
     ;  (println (str (last ((:possession match) (:log match)))))
-    ;  (event match))
+    ;  (event match))))
+    ;(do
+    ;  (println (str (:zone match) " \n" (:minute match) " " event))
+    ;  (event match))))
       (event match)))
 
 (def el-classico (helpers/make-match (helpers/make-team "Real Madrid"
@@ -70,14 +73,18 @@
 
 (def el-classico-fin (simulate-match el-classico))
 
+(dotimes [cnt 1000]
+  (simulate-match el-classico))
 
-;PRED KRAJ
+;URADITI ALI PRED KRAJ
 ;Napraviti -> out, goal-out, foul, penalty
 ;poasonova raspodela
 
 ;URADITI
-;Ubaciti golmana - odbrana suta
-;Ubaciti golmana u igru, pasevi i dueli
+;Ubaciti golmana - odbrana suta -> ZAVRSENO
+;Ubaciti golmana u igru, pasevi i dueli -> ZAVRSENO
+; samo ostaviti :goalkeeper u svakom timu
+; za duele se biraju protivnicki igraci iz attack
 
 (defn simulate-debug-game [state]
   (loop [i 1
@@ -117,6 +124,8 @@
                                                            :attack [(helpers/make-player 20 "Lionel Messi" 94)
                                                                     (helpers/make-player 21 "Pedro" 85)
                                                                     (helpers/make-player 22 "Neymar" 87)]}))]
+    (def el-classico-deb (events/duel (events/resume-game el-classico)))
+
     (simulate-match el-classico)
     ;(simulate-debug-game el-classico)
     ))
