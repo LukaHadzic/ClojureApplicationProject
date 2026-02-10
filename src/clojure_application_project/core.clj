@@ -17,7 +17,7 @@
 
 (defn simulate-minute
   [match]
-  (let [actions-allowed (get events/zone-actions-controller (:zone match))
+  (let [actions-allowed (get events/phase-actions-controller (:phase match))
         event (rand-nth actions-allowed)]
     ;(do
     ;  (println (str "Minute: " (:minute match)))
@@ -29,8 +29,8 @@
     ;  (println (str (last ((:possession match) (:log match)))))
     ;  (event match))))
     ;(do
-    ;  (println (str (:zone match) " \n" (:minute match) " " event))
-    ;  (event match))))
+      ;(println (str (:zone match) " \n" (:minute match) " " event))
+      ;(event match))))
       (event match)))
 
 (def el-classico (helpers/make-match (helpers/make-team "Real Madrid"
@@ -92,7 +92,7 @@
     (if (> i 90)
       s
       (recur (inc i)
-             (events/update-duel-2 s 1 (helpers/rand-opposite-player state))))))
+             (events/update-duel s 1 (helpers/rand-opposite-player state))))))
              ;(events/update-duel s (rand-int 2) (helpers/rand-opposite-player state))))))
              ;(events/offside s)))))
 

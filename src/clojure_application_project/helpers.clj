@@ -3,7 +3,7 @@
 (defn make-player
   [id name skill]
   {:id id :name name :skill skill
-   :goal-keeping 0 :defense 0 :passing 0 :strength 0 :finishing 0 :attack 0
+   :goal-keeping 96 :defense 96 :passing 96 :strength 96 :finishing 96 :attack 96 :speed 96
    :saves 0 :passes 0 :good-passes 0
    :shots 0 :shots-on-goal 0 :goals 0 :duels 0 :duels-won 0 :offsides 0})
 
@@ -17,8 +17,8 @@
                :away {:team away :goals 0}
                :minute 0
                :possession :home
-               :zone :resume
-               :phase :play
+               :zone :attack
+               :phase :resume
                :ball-holder {}
                :log {:home [] :away []}}
         state (assoc state :ball-holder (rand-nth (get-in state [(:possession state) :team :players :attack])))]
@@ -35,6 +35,10 @@
                :log {:home [] :away []}}
         state (assoc state :ball-holder (rand-nth (get-in state [(:possession state) :team :players :attack])))]
     state))
+
+(defn calc-avg
+  [val-1 val-2]
+  (/ (+ val-1 val-2) 2))
 
 (defn opposite-team
   [team]
@@ -156,13 +160,41 @@
         pass-skill (:passing ball-holder)]
     (> r pass-skill)))
 
+(def foul-realiz-possib-map
+  {:goalkeeper {:shot 1}
+   :defense {:pass 1}
+   :midfield {:pass 0.7
+              :shot 0.3}
+   :attack {:pass 0.25
+            :shot 0.75}})
+
+(defn duel-won?
+  [ball-holder opp-player]
+  (closer-value-to-first?
+     (calc-avg (:strength ball-holder) (:speed ball-holder))
+     (calc-avg (:strength opp-player) (:speed opp-player))))
+
+(defn foul?
+  "Greater the strength difference between players, greater the chance for foul."
+  [ball-holder opp-player]
+  (let [r (rand-int 100)
+        ball-holder-stgh (:strength ball-holder)
+        opp-player-stgh (:strength opp-player)]
+    (if (> ball-holder-stgh opp-player-stgh)
+      (and (> r opp-player-stgh) (< r ball-holder-stgh))
+      (and (< r opp-player-stgh) (> r ball-holder-stgh)))))
+
 (defn closer-value-to-first?
   [value-1 value-2]
   (let [total (+ value-1 value-2)
         r (rand-int total)]
     (if (< r value-1)
       true
-      false)))
+      (if (> r value-2)
+        false
+        (if (< (- r value-1) (- value-2 r))
+          true
+          false)))))
 
 (defn inc-events
   [state team player-id events]

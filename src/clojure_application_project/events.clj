@@ -1,187 +1,109 @@
 (ns clojure-application-project.events
   (:require [clojure-application-project.helpers :as helpers]))
 
-
-;(defn update-player-stats
-;  [state event is-good]
-;  (let [curr-team (:possession state)
-;        ball-holder-id (:id (:ball-holder state))
-;        zone ((:zone state) helpers/zone-equals)]
-;    (if (= is-good 1)
-;      (-> state
-;          (update-in [curr-team :team :players zone]
-;                     (fn [players]
-;                       (map (fn [p]
-;                              (if (= (:id p) ball-holder-id)
-;                                (case event
-;                                  "shot" (-> p
-;                                             (update :shots inc)
-;                                             (update :goals inc))
-;                                  "pass" (-> p
-;                                             (update :passes inc)
-;                                             (update :good-passes inc))
-;                                  "duel" (-> p
-;                                             (update :duels inc)
-;                                             (update :duels-won inc)))
-;                                p))
-;                            players))))
-;      (-> state
-;          (update-in [curr-team :team :players zone]
-;                     (fn [players]
-;                       (map (fn [p]
-;                              (if (= (:id p) ball-holder-id)
-;                                (case event
-;                                  "shot" (update p :shots inc)
-;                                  "pass" (update p :passes inc)
-;                                  "duel" (update p :duels inc))
-;                                p))
-;                            players)))))))
-
-;(defn update-duel
-;  [state is-duel-won opp-player]
-;  (let [curr-team (:possession state)
-;        opp-team (helpers/opposite-team curr-team)
-;        ball-holder-id (:id (:ball-holder state))
-;        opp-player-id (:id opp-player)
-;        zone (:zone state)]
-;    (if (= is-duel-won 1)
-;      (-> state
-;          (update-in [curr-team :team :players zone]
-;                     (fn [players]
-;                       (map (fn [p]
-;                              (if (= (:id p) ball-holder-id)
-;                                (-> p
-;                                    (update :duels inc)
-;                                    (update :duels-won inc))
-;                                p))
-;                            players)))
-;          (update-in [opp-team :team :players (helpers/opposite-zone state)]
-;                     (fn [players]
-;                       (map (fn [p]
-;                              (if (= (:id p) opp-player-id)
-;                                (-> p
-;                                    (update :duels inc))
-;                                p))
-;                            players))))
-;      (-> state
-;          (update-in [opp-team :team :players (helpers/opposite-zone state)]
-;                     (fn [players]
-;                       (map (fn [p]
-;                              (if (= (:id p) opp-player-id)
-;                                (-> p
-;                                    (update :duels inc)
-;                                    (update :duels-won inc))
-;                                p))
-;                            players)))
-;          (update-in [curr-team :team :players zone]
-;                     (fn [players]
-;                       (map (fn [p]
-;                              (if (= (:id p) ball-holder-id)
-;                                (-> p
-;                                    (update :duels inc))
-;                                p))
-;                            players)))))))
-
-(defn update-duel-2
+(defn update-duel
   [state is-duel-won opp-player]
   (let [curr-team (:possession state)
         opp-team (helpers/opposite-team curr-team)
         ball-holder-id (:id (:ball-holder state))
-        opp-player-id (:id opp-player)
-        zone (:zone state)]
+        opp-player-id (:id opp-player)]
     (if (= is-duel-won 1)
       (-> state
-          ;(update-in [curr-team :team :players]
-          ;           (fn [pl-pos-map]
-          ;             (update-vals pl-pos-map
-          ;                          (fn [players]
-          ;                            (map (fn [p]
-          ;                                   (if (= (:id p) ball-holder-id)
-          ;                                     (-> p
-          ;                                         (update :duels inc)
-          ;                                         (update :duels-won inc))
-          ;                                     p))
-          ;                                 players)))))
           (helpers/inc-events curr-team ball-holder-id [:duels :duels-won])
           (helpers/inc-events opp-team opp-player-id [:duels]))
-          ;(update-in [opp-team :team :players]
-          ;           (fn [pl-pos-map]
-          ;             (update-vals pl-pos-map
-          ;                          (fn [players]
-          ;                            (map (fn [p]
-          ;                                   (if (= (:id p) opp-player-id)
-          ;                                     (-> p
-          ;                                         (update :duels inc))
-          ;                                     p))
-          ;                                 players))))))
       (-> state
-          ;(update-in [opp-team :team :players]
-          ;           (fn [pl-pos-map]
-          ;             (update-vals pl-pos-map
-          ;                          (fn [players]
-          ;                            (map (fn [p]
-          ;                                   (if (= (:id p) opp-player-id)
-          ;                                     (-> p
-          ;                                         (update :duels inc)
-          ;                                         (update :duels-won inc))
-          ;                                     p))
-          ;                                 players)))))
           (helpers/inc-events opp-team opp-player-id [:duels :duels-won])
           (helpers/inc-events curr-team ball-holder-id [:duels])))))
-          ;(update-in [curr-team :team :players]
-          ;           (fn [pl-pos-map]
-          ;             (update-vals pl-pos-map
-          ;                          (fn [players]
-          ;                            (map (fn [p]
-          ;                                   (if (= (:id p) ball-holder-id)
-          ;                                     (-> p
-          ;                                         (update :duels inc))
-          ;                                     p))
-          ;                                 players)))))))))
 
-(defn duel
-  [state]
-  (let [ball-holder (:ball-holder state)
-        opp-player (helpers/rand-opposite-player state)]
-  (if (> (:skill ball-holder) (:skill opp-player))
-  ;(if (> (:skill ball-holder) 1)
+;(defn duel
+;  [state]
+;  (let [ball-holder (:ball-holder state)
+;        opp-player (helpers/rand-opposite-player state)]
+;  (if (> (:skill ball-holder) (:skill opp-player))
+;  ;(if (> (:skill ball-holder) 1)
+;  ;(if (helpers/closer-value-to-first?
+;  ; (helpers/calc-avg (:strength ball-holder) (:speed ball-holder))
+;  ; (helpers/calc-avg (:strength opp-player) (:speed opp-player)))
+;    (let [current-team (:possession state)
+;          diff-team (helpers/opposite-team current-team)]
+;      (if (<= (rand-int 3) 1)
+;      ;(if (<= (rand-int 3) -1)
+;      ;(if (> (helpers/closer-value-to-first? (:speed ball-holder) (:speed opp-player)))
+;      (-> state
+;            (update-duel 1 opp-player)
+;            (update-in [:log current-team] conj :duel-won)
+;            (update-in [:log diff-team] conj :duel-lost))
+;        (-> state
+;            (update-duel 1 opp-player)
+;            (update-in [:log current-team] conj :duel-won)
+;            (update-in [:log diff-team] conj :duel-lost)
+;            (assoc :zone (helpers/next-zone (:zone state)))
+;            (assoc :phase (helpers/next-zone (:zone state))))))
+;    (let [old-possession (:possession state)
+;          new-possession (helpers/opposite-team old-possession)
+;          ;new-zone (helpers/opposite-zone state)]
+;          new-zone (helpers/opposite-zone (:zone state))]
+;      (-> state
+;          (update-duel 0 opp-player)
+;          (update-in [:log old-possession] conj :duel-lost)
+;          (update-in [:log new-possession] conj :duel-won)
+;          (assoc :zone new-zone)
+;          (assoc :phase new-zone)
+;          (assoc :possession new-possession
+;                 :ball-holder opp-player))))))
+
+(defn finish-duel
+  [state is-duel-won opp-player]
+  (if (= is-duel-won 1)
     (let [current-team (:possession state)
           diff-team (helpers/opposite-team current-team)]
       (if (<= (rand-int 3) 1)
-      ;(if (<= (rand-int 3) -1)
+        ;(if (<= (rand-int 3) -1)
+        ;(if (> (helpers/closer-value-to-first? (:speed ball-holder) (:speed opp-player)))
         (-> state
-            (update-duel-2 1 opp-player)
+            (update-duel 1 opp-player)
             (update-in [:log current-team] conj :duel-won)
             (update-in [:log diff-team] conj :duel-lost))
         (-> state
-            (update-duel-2 1 opp-player)
+            (update-duel 1 opp-player)
             (update-in [:log current-team] conj :duel-won)
             (update-in [:log diff-team] conj :duel-lost)
-            (assoc :zone (helpers/next-zone (:zone state))))))
+            (assoc :zone (helpers/next-zone (:zone state)))
+            (assoc :phase (helpers/next-zone (:zone state))))))
     (let [old-possession (:possession state)
           new-possession (helpers/opposite-team old-possession)
           ;new-zone (helpers/opposite-zone state)]
           new-zone (helpers/opposite-zone (:zone state))]
       (-> state
-          (update-duel-2 0 opp-player)
+          (update-duel 0 opp-player)
           (update-in [:log old-possession] conj :duel-lost)
           (update-in [:log new-possession] conj :duel-won)
           (assoc :zone new-zone)
+          (assoc :phase new-zone)
           (assoc :possession new-possession
-                 :ball-holder opp-player))))))
+                 :ball-holder opp-player)))))
 
-;(defn finish-shot
-;  [state event-1 event-2 zone is-goal new-zone]
-;  (let [team (:possession state)
-;        new-possession (helpers/opposite-team team)
-;        updated-ball-holder (helpers/new-ball-holder-2 state new-possession zone)]
-;    (-> state
-;        (update-in [:log team] conj event-1)
-;        (update-in [:log new-possession] conj event-2)
-;        (update-in [team :goals] + is-goal)
-;        (assoc :zone new-zone)
-;        (assoc :ball-holder updated-ball-holder)
-;        (assoc :possession new-possession))))
+(defn duel-won
+  [state opp-player]
+  (finish-duel state 1 opp-player))
+
+(defn duel-lost
+  [state opp-player]
+  (finish-duel state 0 opp-player))
+
+(defn foul
+  [state opp-player]
+  )
+
+(defn duel
+  [state]
+  (let [ball-holder (:ball-holder state)
+        opp-player (helpers/rand-opposite-player state)]
+    (if (helpers/foul? ball-holder opp-player)
+      (foul state opp-player)
+      (if (helpers/duel-won? ball-holder opp-player)
+        (duel-won state opp-player)
+        (duel-lost state opp-player)))))
 
 (defn update-shot
   [state is-goal]
@@ -189,29 +111,8 @@
         ball-holder-id (:id (:ball-holder state))]
     (if (= is-goal 1)
       (-> state
-          ;(update-in [curr-team :team :players]
-          ;           (fn [pl-pos-map]
-          ;             (update-vals pl-pos-map
-          ;                          (fn [players]
-          ;                            (map (fn [p]
-          ;                                   (if (= (:id p) ball-holder-id)
-          ;                                     (-> p
-          ;                                         (update :shots inc)
-          ;                                         (update :goals inc))
-          ;                                     p))
-          ;                                 players))))))
           (helpers/inc-events curr-team ball-holder-id [:shots :shots-on-goal :goals]))
       (-> state
-          ;(update-in [curr-team :team :players]
-          ;           (fn [pl-pos-map]
-          ;             (update-vals pl-pos-map
-          ;                          (fn [players]
-          ;                            (map (fn [p]
-          ;                                   (if (= (:id p) ball-holder-id)
-          ;                                     (-> p
-          ;                                         (update :shots inc))
-          ;                                     p))
-          ;                                 players)))))))))
           (helpers/inc-events curr-team ball-holder-id [:shots])))))
 
 (defn finish-shot
@@ -225,7 +126,8 @@
             (update-in [:log team] conj event)
             (update-in [:log new-possession] conj :conceded-goal)
             (update-in [team :goals] + 1)
-            (assoc :zone :resume)
+            (assoc :zone :attack)
+            (assoc :phase :resume)
             (assoc :ball-holder updated-ball-holder)
             (assoc :possession new-possession)))
       (let [updated-ball-holder (first (get-in state [new-possession :team :players :goalkeeper]))]
@@ -233,7 +135,8 @@
             (update-shot 0)
             (update-in [:log team] conj :miss)
             (update-in [:log new-possession] conj :ball-won)
-            (assoc :zone :resume-goal-out)
+            (assoc :zone :goalkeeper)
+            (assoc :phase :goal-out)
             (assoc :ball-holder updated-ball-holder)
             (assoc :possession new-possession))))))
 
@@ -242,10 +145,8 @@
   ;(finish-shot state :goal :conceded-goal :midfield 1 :resume))
   (finish-shot state :goal))
 
-
 (defn miss
   [state]
-  ;(finish-shot state :miss :ball-won :defense 0 :defense))
   (finish-shot state :miss))
 
 (defn shot-saved
@@ -262,6 +163,7 @@
           (helpers/inc-events curr-team ball-holder-id [:shots-on-goal :shots])
           (helpers/inc-events opp-team goalkeeper-id [:saves])
           (assoc :zone :goalkeeper)
+          (assoc :phase :goalkeeper)
           (update-in [:log opp-team] conj :shot-saved)
           (update-in [:log curr-team] conj :miss))
       (-> state
@@ -270,6 +172,7 @@
           (helpers/inc-events curr-team ball-holder-id [:shots-on-goal :shots])
           (helpers/inc-events opp-team goalkeeper-id [:saves])
           (assoc :zone :defense)
+          (assoc :phase :defense)
           (update-in [:log opp-team] conj :shot-saved)
           (update-in [:log curr-team] conj :miss)))))
 
@@ -288,34 +191,12 @@
 (defn update-pass
   [state is-good-pass]
   (let [curr-team (:possession state)
-        ball-holder-id (:id (:ball-holder state))
-        zone (:zone state)]
+        ball-holder-id (:id (:ball-holder state))]
     (if (= is-good-pass 1)
       (-> state
-          ;(update-in [curr-team :team :players]
-          ;           (fn [pl-pos-map]
-          ;             (update-vals pl-pos-map
-          ;                          (fn [players]
-          ;                            (map (fn [p]
-          ;                                   (if (= (:id p) ball-holder-id)
-          ;                                     (-> p
-          ;                                         (update :passes inc)
-          ;                                         (update :good-passes inc))
-          ;                                     p))
-          ;                                 players))))))
           (helpers/inc-events curr-team ball-holder-id [:passes :good-passes]))
       (-> state
           (helpers/inc-events curr-team ball-holder-id [:passes])))))
-          ;(update-in [curr-team :team :players]
-          ;           (fn [pl-pos-map]
-          ;             (update-vals pl-pos-map
-          ;                          (fn [players]
-          ;                            (map (fn [p]
-          ;                                   (if (= (:id p) ball-holder-id)
-          ;                                     (-> p
-          ;                                         (update :passes inc))
-          ;                                     p))
-          ;                                 players)))))))))
 
 (defn finish-pass
   [state zone team log-text]
@@ -325,6 +206,7 @@
               (update-pass 1)
               (assoc :possession team)
               (assoc :zone zone)
+              (assoc :phase zone)
               (assoc :ball-holder updated-ball-holder)
               (update-in [:log team] conj :pass)))
         ;(let [new-zone (helpers/opposite-zone state)
@@ -334,6 +216,7 @@
               (update-pass 0)
               (assoc :possession team)
               (assoc :zone new-zone)
+              (assoc :phase new-zone)
               (assoc :ball-holder updated-ball-holder)
               (update-in [:log team] conj :ball-won)
               (update-in [:log (helpers/opposite-team team)] conj :ball-lost)))))
@@ -359,20 +242,11 @@
         offside-holder-id (:id (helpers/new-ball-holder state old-possession old-zone))]
     (-> state
         (update-pass 0)
-        ;(update-in [old-possession :team :players]
-        ;           (fn [player-pos-map]
-        ;             (update-vals player-pos-map
-        ;                          (fn [players]
-        ;                            (map (fn [p]
-        ;                                   (if (= (:id p) offside-holder-id)
-        ;                                     (-> p
-        ;                                         (update :offsides inc))
-        ;                                     p))
-        ;                                 players)))))
         (helpers/inc-events old-possession offside-holder-id [:offsides])
         (assoc :possession new-possession)
         (assoc :ball-holder new-holder)
-        (assoc :zone :offside)
+        (assoc :zone :defense)
+        (assoc :phase :offside)
         (update-in [:log old-possession] conj :offside))))
 
 (defn out ;Upada se u petlju, mora da se ustanovi da je out pa tek onda da se izvede
@@ -387,7 +261,7 @@
         (assoc :possession new-possession)
         (assoc :ball-holder new-ball-holder)
         (assoc :zone new-zone)
-        (assoc :phase :stopped)
+        (assoc :phase :out)
         (update-in [:log old-possession] conj :out-ball-lost)
         (update-in [:log new-possession] conj :out-ball-won))))
 
@@ -407,16 +281,16 @@
   [state] ;Bolje napraviti i resume-out koja ce zvati pass-no-offside
   (let [zone-begin (:zone state)
         zone-end (helpers/choose-pass-end-zone zone-begin)]
-    (if (and (= (:phase state) :stopped)
+    (if (and (= (:phase state) :out)
          (helpers/out? (:ball-holder state)))
       (out state zone-end)
       (if (helpers/pass? zone-begin zone-end)
         (-> state
             (good-pass zone-end)
-            (assoc :phase :play))
+            (assoc :phase zone-end))
         (-> state
             (bad-pass zone-end)
-            (assoc :phase :play))))))
+            (assoc :phase zone-end))))))
 
 (defn resume-game
   [state]
@@ -424,15 +298,26 @@
 
 (defn resume-goal-out
   [state]
-  (pass (assoc state :zone :goalkeeper)))
+  (pass (assoc state :phase :goalkeeper)))
 
 (defn resume-offside
   [state] ;Nema ofsajda nakon ofsajda i ova fja zove pass-no-offside
-  (pass (assoc state :zone :defense)))
+  (pass (assoc state :phase :defense)))
 
 (defn resume-out
   [state]
   (pass-no-offside state))
+
+(def phase-actions-controller
+  {:defense [pass duel]
+   :midfield [pass duel]
+   :attack [pass duel shot]
+   :offside [resume-offside]
+   :resume [resume-game]
+   :goal-out [resume-goal-out]
+   :goalkeeper [pass duel]
+   :out [resume-out]
+   :foul [resume-foul]})
 
 (def zone-actions-controller
   {:defense [pass duel]
@@ -440,6 +325,6 @@
    :attack [pass duel shot]
    :offside [resume-offside]
    :resume [resume-game]
-   :resume-goal-out [resume-goal-out]
+   :goal-out [resume-goal-out]
    :goalkeeper [pass duel]
-   :resume-out [resume-out]})
+   :out [resume-out]})
