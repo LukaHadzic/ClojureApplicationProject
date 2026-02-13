@@ -1,110 +1,6 @@
 (ns clojure-application-project.events
   (:require [clojure-application-project.helpers :as helpers]))
 
-(defn update-duel
-  [state is-duel-won opp-player]
-  (let [curr-team (:possession state)
-        opp-team (helpers/opposite-team curr-team)
-        ball-holder-id (:id (:ball-holder state))
-        opp-player-id (:id opp-player)]
-    (if (= is-duel-won 1)
-      (-> state
-          (helpers/inc-events curr-team ball-holder-id [:duels :duels-won])
-          (helpers/inc-events opp-team opp-player-id [:duels]))
-      (-> state
-          (helpers/inc-events opp-team opp-player-id [:duels :duels-won])
-          (helpers/inc-events curr-team ball-holder-id [:duels])))))
-
-;(defn duel
-;  [state]
-;  (let [ball-holder (:ball-holder state)
-;        opp-player (helpers/rand-opposite-player state)]
-;  (if (> (:skill ball-holder) (:skill opp-player))
-;  ;(if (> (:skill ball-holder) 1)
-;  ;(if (helpers/closer-value-to-first?
-;  ; (helpers/calc-avg (:strength ball-holder) (:speed ball-holder))
-;  ; (helpers/calc-avg (:strength opp-player) (:speed opp-player)))
-;    (let [current-team (:possession state)
-;          diff-team (helpers/opposite-team current-team)]
-;      (if (<= (rand-int 3) 1)
-;      ;(if (<= (rand-int 3) -1)
-;      ;(if (> (helpers/closer-value-to-first? (:speed ball-holder) (:speed opp-player)))
-;      (-> state
-;            (update-duel 1 opp-player)
-;            (update-in [:log current-team] conj :duel-won)
-;            (update-in [:log diff-team] conj :duel-lost))
-;        (-> state
-;            (update-duel 1 opp-player)
-;            (update-in [:log current-team] conj :duel-won)
-;            (update-in [:log diff-team] conj :duel-lost)
-;            (assoc :zone (helpers/next-zone (:zone state)))
-;            (assoc :phase (helpers/next-zone (:zone state))))))
-;    (let [old-possession (:possession state)
-;          new-possession (helpers/opposite-team old-possession)
-;          ;new-zone (helpers/opposite-zone state)]
-;          new-zone (helpers/opposite-zone (:zone state))]
-;      (-> state
-;          (update-duel 0 opp-player)
-;          (update-in [:log old-possession] conj :duel-lost)
-;          (update-in [:log new-possession] conj :duel-won)
-;          (assoc :zone new-zone)
-;          (assoc :phase new-zone)
-;          (assoc :possession new-possession
-;                 :ball-holder opp-player))))))
-
-(defn finish-duel
-  [state is-duel-won opp-player]
-  (if (= is-duel-won 1)
-    (let [current-team (:possession state)
-          diff-team (helpers/opposite-team current-team)]
-      (if (<= (rand-int 3) 1)
-        ;(if (<= (rand-int 3) -1)
-        ;(if (> (helpers/closer-value-to-first? (:speed ball-holder) (:speed opp-player)))
-        (-> state
-            (update-duel 1 opp-player)
-            (update-in [:log current-team] conj :duel-won)
-            (update-in [:log diff-team] conj :duel-lost))
-        (-> state
-            (update-duel 1 opp-player)
-            (update-in [:log current-team] conj :duel-won)
-            (update-in [:log diff-team] conj :duel-lost)
-            (assoc :zone (helpers/next-zone (:zone state)))
-            (assoc :phase (helpers/next-zone (:zone state))))))
-    (let [old-possession (:possession state)
-          new-possession (helpers/opposite-team old-possession)
-          ;new-zone (helpers/opposite-zone state)]
-          new-zone (helpers/opposite-zone (:zone state))]
-      (-> state
-          (update-duel 0 opp-player)
-          (update-in [:log old-possession] conj :duel-lost)
-          (update-in [:log new-possession] conj :duel-won)
-          (assoc :zone new-zone)
-          (assoc :phase new-zone)
-          (assoc :possession new-possession
-                 :ball-holder opp-player)))))
-
-(defn duel-won
-  [state opp-player]
-  (finish-duel state 1 opp-player))
-
-(defn duel-lost
-  [state opp-player]
-  (finish-duel state 0 opp-player))
-
-(defn foul
-  [state opp-player]
-  )
-
-(defn duel
-  [state]
-  (let [ball-holder (:ball-holder state)
-        opp-player (helpers/rand-opposite-player state)]
-    (if (helpers/foul? ball-holder opp-player)
-      (foul state opp-player)
-      (if (helpers/duel-won? ball-holder opp-player)
-        (duel-won state opp-player)
-        (duel-lost state opp-player)))))
-
 (defn update-shot
   [state is-goal]
   (let [curr-team (:possession state)
@@ -291,6 +187,141 @@
         (-> state
             (bad-pass zone-end)
             (assoc :phase zone-end))))))
+
+(defn update-duel
+  [state is-duel-won opp-player]
+  (let [curr-team (:possession state)
+        opp-team (helpers/opposite-team curr-team)
+        ball-holder-id (:id (:ball-holder state))
+        opp-player-id (:id opp-player)]
+    (if (= is-duel-won 1)
+      (-> state
+          (helpers/inc-events curr-team ball-holder-id [:duels :duels-won])
+          (helpers/inc-events opp-team opp-player-id [:duels]))
+      (-> state
+          (helpers/inc-events opp-team opp-player-id [:duels :duels-won])
+          (helpers/inc-events curr-team ball-holder-id [:duels])))))
+
+;(defn duel
+;  [state]
+;  (let [ball-holder (:ball-holder state)
+;        opp-player (helpers/rand-opposite-player state)]
+;  (if (> (:skill ball-holder) (:skill opp-player))
+;  ;(if (> (:skill ball-holder) 1)
+;  ;(if (helpers/closer-value-to-first?
+;  ; (helpers/calc-avg (:strength ball-holder) (:speed ball-holder))
+;  ; (helpers/calc-avg (:strength opp-player) (:speed opp-player)))
+;    (let [current-team (:possession state)
+;          diff-team (helpers/opposite-team current-team)]
+;      (if (<= (rand-int 3) 1)
+;      ;(if (<= (rand-int 3) -1)
+;      ;(if (> (helpers/closer-value-to-first? (:speed ball-holder) (:speed opp-player)))
+;      (-> state
+;            (update-duel 1 opp-player)
+;            (update-in [:log current-team] conj :duel-won)
+;            (update-in [:log diff-team] conj :duel-lost))
+;        (-> state
+;            (update-duel 1 opp-player)
+;            (update-in [:log current-team] conj :duel-won)
+;            (update-in [:log diff-team] conj :duel-lost)
+;            (assoc :zone (helpers/next-zone (:zone state)))
+;            (assoc :phase (helpers/next-zone (:zone state))))))
+;    (let [old-possession (:possession state)
+;          new-possession (helpers/opposite-team old-possession)
+;          ;new-zone (helpers/opposite-zone state)]
+;          new-zone (helpers/opposite-zone (:zone state))]
+;      (-> state
+;          (update-duel 0 opp-player)
+;          (update-in [:log old-possession] conj :duel-lost)
+;          (update-in [:log new-possession] conj :duel-won)
+;          (assoc :zone new-zone)
+;          (assoc :phase new-zone)
+;          (assoc :possession new-possession
+;                 :ball-holder opp-player))))))
+
+(defn finish-duel
+  [state is-duel-won opp-player]
+  (if (= is-duel-won 1)
+    (let [current-team (:possession state)
+          diff-team (helpers/opposite-team current-team)]
+      (if (<= (rand-int 3) 1)
+        ;(if (<= (rand-int 3) -1)
+        ;(if (> (helpers/closer-value-to-first? (:speed ball-holder) (:speed opp-player)))
+        (-> state
+            (update-duel 1 opp-player)
+            (update-in [:log current-team] conj :duel-won)
+            (update-in [:log diff-team] conj :duel-lost))
+        (-> state
+            (update-duel 1 opp-player)
+            (update-in [:log current-team] conj :duel-won)
+            (update-in [:log diff-team] conj :duel-lost)
+            (assoc :zone (helpers/next-zone (:zone state)))
+            (assoc :phase (helpers/next-zone (:zone state))))))
+    (let [old-possession (:possession state)
+          new-possession (helpers/opposite-team old-possession)
+          ;new-zone (helpers/opposite-zone state)]
+          new-zone (helpers/opposite-zone (:zone state))]
+      (-> state
+          (update-duel 0 opp-player)
+          (update-in [:log old-possession] conj :duel-lost)
+          (update-in [:log new-possession] conj :duel-won)
+          (assoc :zone new-zone)
+          (assoc :phase new-zone)
+          (assoc :possession new-possession
+                 :ball-holder opp-player)))))
+
+(defn duel-won
+  [state opp-player]
+  (finish-duel state 1 opp-player))
+
+(defn duel-lost
+  [state opp-player]
+  (finish-duel state 0 opp-player))
+
+(def event-mapper
+  {:shot shot
+   :pass pass})
+
+(defn resume-foul
+  [state]
+  (let [zone (:zone state)
+        event (event-mapper (helpers/choose-foul-event zone))]
+    (-> state
+        (assoc :ball-holder (helpers/choose-pl-for-event state event))
+        (event))))
+
+(defn foul
+  [state opp-player]
+  (let [ball-holder (:ball-holder state)
+        curr-team (:possession state)
+        opp-team (helpers/opposite-team curr-team)
+        new-zone (helpers/opposite-zone (:zone state))]
+    (if (helpers/foul-attack? ball-holder opp-player)
+      (-> state
+          (helpers/inc-events curr-team (:id ball-holder) [:fouls :duels])
+          (helpers/inc-events opp-team (:id opp-player) [:duels :duels-won])
+          (assoc :ball-holder opp-player)
+          (assoc :possession opp-team)
+          (assoc :zone new-zone)
+          (assoc :phase :foul)
+          (update-in [:log curr-team] conj :foul)
+          (update-in [:log opp-team] conj :fouled))
+      (-> state
+          (helpers/inc-events curr-team (:id ball-holder) [:duels :duels-won])
+          (helpers/inc-events opp-team (:id opp-player) [:duels :fouls])
+          (assoc :phase :foul)
+          (update-in [:log curr-team] conj :fouled)
+          (update-in [:log opp-team] conj :foul)))))
+
+(defn duel
+  [state]
+  (let [ball-holder (:ball-holder state)
+        opp-player (helpers/rand-opposite-player state)]
+    (if (helpers/foul? ball-holder opp-player)
+      (foul state opp-player)
+      (if (helpers/duel-won? ball-holder opp-player)
+        (duel-won state opp-player)
+        (duel-lost state opp-player)))))
 
 (defn resume-game
   [state]

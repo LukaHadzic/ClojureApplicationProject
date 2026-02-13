@@ -110,7 +110,7 @@
                                                                        (helpers/make-player 8 "Angel Di Maria" 88)]
                                                             :attack [(helpers/make-player 9 "Cristiano Ronaldo" 92)
                                                                      (helpers/make-player 10 "Karim Benzema" 87)
-                                                                     (helpers/make-player 11 "Gareth Bale" 91)]})
+                                                                     (helpers/make-player 11 "Gareth Bale" 93)]})
 
                                        (helpers/make-team "Barcelona"
                                                           {:goalkeeper [(helpers/make-player 12 "Victor Valdes" 87)]
@@ -124,7 +124,7 @@
                                                            :attack [(helpers/make-player 20 "Lionel Messi" 94)
                                                                     (helpers/make-player 21 "Pedro" 85)
                                                                     (helpers/make-player 22 "Neymar" 87)]}))]
-    (def el-classico-deb (events/duel (events/resume-game el-classico)))
+    (def el-classico-deb (events/resume-foul (events/duel (events/resume-game el-classico))))
 
     (simulate-match el-classico)
     ;(simulate-debug-game el-classico)

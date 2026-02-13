@@ -5,7 +5,7 @@
   {:id id :name name :skill skill
    :goal-keeping 96 :defense 96 :passing 96 :strength 96 :finishing 96 :attack 96 :speed 96
    :saves 0 :passes 0 :good-passes 0
-   :shots 0 :shots-on-goal 0 :goals 0 :duels 0 :duels-won 0 :offsides 0})
+   :shots 0 :shots-on-goal 0 :goals 0 :duels 0 :duels-won 0 :offsides 0 :fouls 0})
 
 (defn make-team
   [name players-and-positions]
@@ -40,6 +40,18 @@
   [val-1 val-2]
   (/ (+ val-1 val-2) 2))
 
+(defn closer-value-to-first?
+  [value-1 value-2]
+  (let [total (+ value-1 value-2)
+        r (rand-int total)]
+    (if (< r value-1)
+      true
+      (if (> r value-2)
+        false
+        (if (< (- r value-1) (- value-2 r))
+          true
+          false)))))
+
 (defn opposite-team
   [team]
   (if (= team :home) :away :home))
@@ -59,6 +71,13 @@
 (defn next-zone
   [curr-zone]
   (get next-zone-map curr-zone))
+
+(defn prev-zone
+  [curr-zone]
+  (some (fn [[k v]]
+          (when (and (= v curr-zone) (not= k v))
+            k))
+        next-zone-map))
 
 (defn opposite-zone
   [zone]
@@ -98,6 +117,51 @@
 (defn goal?
   [player]
   (> (:skill player) (rand-int 101)))
+
+(def foul-realiz-possib-map
+  {:goalkeeper {:shot 1}
+   :defense {:pass 1}
+   :midfield {:pass 0.7
+              :shot 0.3}
+   :attack {:pass 0.25
+            :shot 0.75}})
+
+(defn choose-pl-max-attr
+  [players attr]
+  (loop [max-attr 0
+         max-player nil
+         [p & rest] players]
+    (if (nil? p)
+      max-player
+      (let [val-attr (attr p)]
+        (if (> val-attr max-attr)
+          (recur val-attr p rest)
+          (recur max-attr max-player rest))))))
+  ;(apply max-key attr players))
+
+(defn choose-pl-for-event
+  [state event]
+  (let [curr-team (:possession state)
+        curr-zone (:zone state)
+        zone-before (prev-zone curr-zone)
+        players (concat (get-in state [curr-team :team :players curr-zone])
+                        (get-in state [curr-team :team :players zone-before]))]
+  ;(if (= event :out)
+  (if (= event :shot)
+    (choose-pl-max-attr players :finishing)
+    (choose-pl-max-attr players :passing))))
+    ;(choose-pl-max-attr players :skill))))
+
+(defn choose-foul-event
+  [zone]
+  (let [r (rand)
+        actions-probs (zone foul-realiz-possib-map)]
+    (loop [acc 0
+           [[action prob] & rest] actions-probs]
+      (let [new-acc (+ prob acc)]
+        (if (< r new-acc)
+          action
+          (recur new-acc rest))))))
 
 (def pass-possibilities
   {:goalkeeper {:defense 0.7
@@ -160,19 +224,19 @@
         pass-skill (:passing ball-holder)]
     (> r pass-skill)))
 
-(def foul-realiz-possib-map
-  {:goalkeeper {:shot 1}
-   :defense {:pass 1}
-   :midfield {:pass 0.7
-              :shot 0.3}
-   :attack {:pass 0.25
-            :shot 0.75}})
-
 (defn duel-won?
   [ball-holder opp-player]
   (closer-value-to-first?
      (calc-avg (:strength ball-holder) (:speed ball-holder))
      (calc-avg (:strength opp-player) (:speed opp-player))))
+
+(defn foul-attack?
+  "Is attacking player made foul or it was defending player?"
+  [ball-holder opp-player]
+  (let [r (rand-int 100)
+        ball-holder-stgh (:strength ball-holder)
+        opp-player-stgh (:strength opp-player)]
+    (closer-value-to-first? ball-holder-stgh opp-player-stgh)))
 
 (defn foul?
   "Greater the strength difference between players, greater the chance for foul."
@@ -180,21 +244,10 @@
   (let [r (rand-int 100)
         ball-holder-stgh (:strength ball-holder)
         opp-player-stgh (:strength opp-player)]
-    (if (> ball-holder-stgh opp-player-stgh)
-      (and (> r opp-player-stgh) (< r ball-holder-stgh))
+    (if (>= ball-holder-stgh opp-player-stgh)
+      (> 2 1)
+      ;(and (> r opp-player-stgh) (< r ball-holder-stgh))
       (and (< r opp-player-stgh) (> r ball-holder-stgh)))))
-
-(defn closer-value-to-first?
-  [value-1 value-2]
-  (let [total (+ value-1 value-2)
-        r (rand-int total)]
-    (if (< r value-1)
-      true
-      (if (> r value-2)
-        false
-        (if (< (- r value-1) (- value-2 r))
-          true
-          false)))))
 
 (defn inc-events
   [state team player-id events]
