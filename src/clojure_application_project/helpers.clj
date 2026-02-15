@@ -36,6 +36,11 @@
         state (assoc state :ball-holder (rand-nth (get-in state [(:possession state) :team :players :attack])))]
     state))
 
+(defn wrap-return
+  [new-state event-duration]
+  {:new-state new-state
+   :event-duration event-duration})
+
 (defn calc-avg
   [val-1 val-2]
   (/ (+ val-1 val-2) 2))
@@ -162,6 +167,11 @@
         (if (< r new-acc)
           action
           (recur new-acc rest))))))
+
+;(def zone-event-probs
+;  {:goalkeeper {:pass 0.9 :duel 0.1}
+;   :defense {:pass 0.7 :duel 0.25 :shot 0.05}
+;   :defense {:pass 0.7 :duel 0.25 :shot 0.05}})
 
 (def pass-possibilities
   {:goalkeeper {:defense 0.7

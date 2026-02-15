@@ -72,17 +72,21 @@
           (update-in [:log opp-team] conj :shot-saved)
           (update-in [:log curr-team] conj :miss)))))
 
+(declare get-shot-duration)
 (defn shot
   "Shot can be on or off the goal"
   [state]
   (let [ball-holder (:ball-holder state)
         opp-team (helpers/opposite-team (:possession state))
-        goalkeeper (first (get-in state [opp-team :team :players :goalkeeper]))]
-    (if (helpers/closer-value-to-first? (:skill ball-holder) (:skill goalkeeper))
-      (if (helpers/goal? (:ball-holder state))
-        (goal state)
-        (miss state))
-      (shot-saved state))))
+        goalkeeper (first (get-in state [opp-team :team :players :goalkeeper]))
+        shot-duration (+ (rand) (get-shot-duration (:zone state)))
+        new-state
+        (if (helpers/closer-value-to-first? (:skill ball-holder) (:skill goalkeeper))
+          (if (helpers/goal? (:ball-holder state))
+            (goal state)
+            (miss state))
+          (shot-saved state))]
+    (helpers/wrap-return new-state shot-duration)))
 
 (defn update-pass
   [state is-good-pass]
@@ -116,6 +120,13 @@
               (assoc :ball-holder updated-ball-holder)
               (update-in [:log team] conj :ball-won)
               (update-in [:log (helpers/opposite-team team)] conj :ball-lost)))))
+
+(declare get-pass-duration)
+(defn resume-good-pass
+  [state zone-end]
+  (let [team (:possession state)
+        pass-duration (+ (rand) (get-pass-duration :attack zone-end))]
+    (helpers/wrap-return (finish-pass state zone-end team :pass) pass-duration)))
 
 (defn good-pass
   ;"Pass is good, choose player from pass-end zone for new ball holder"
@@ -161,32 +172,41 @@
         (update-in [:log old-possession] conj :out-ball-lost)
         (update-in [:log new-possession] conj :out-ball-won))))
 
+(declare get-pass-duration)
 (defn pass ;Za izvodjenje out-a napraviti pass-no-offside koji je veoma slicna fja
   [state] ;Bolje napraviti i resume-out koja ce zvati pass-no-offside
   (if (helpers/offside?)
-    (offside state)
+    (let [event-duration (+ (rand) (get-pass-duration (:zone state) :attack))
+          new-state (offside state)]
+      (helpers/wrap-return new-state event-duration))
+    ;(offside state)
     (let [zone-begin (:zone state)
-          zone-end (helpers/choose-pass-end-zone zone-begin)]
+          zone-end (helpers/choose-pass-end-zone zone-begin)
+          pass-duration (+ (rand) (get-pass-duration zone-begin zone-end))]
     (if (helpers/out? (:ball-holder state))
-      (out state zone-end)
+      (helpers/wrap-return (out state zone-end) pass-duration)
+      ;(out state zone-end)
       (if (helpers/pass? zone-begin zone-end)
-        (good-pass state zone-end)
-        (bad-pass state zone-end))))))
+        (helpers/wrap-return (good-pass state zone-end) pass-duration)
+        (helpers/wrap-return (bad-pass state zone-end) pass-duration))))))
 
 (defn pass-no-offside ;Za izvodjenje out-a napraviti pass-no-offside koji je veoma slicna fja
   [state] ;Bolje napraviti i resume-out koja ce zvati pass-no-offside
   (let [zone-begin (:zone state)
-        zone-end (helpers/choose-pass-end-zone zone-begin)]
+        zone-end (helpers/choose-pass-end-zone zone-begin)
+        pass-duration (+ (rand) (get-pass-duration zone-begin zone-end))]
     (if (and (= (:phase state) :out)
          (helpers/out? (:ball-holder state)))
-      (out state zone-end)
-      (if (helpers/pass? zone-begin zone-end)
-        (-> state
-            (good-pass zone-end)
-            (assoc :phase zone-end))
-        (-> state
-            (bad-pass zone-end)
-            (assoc :phase zone-end))))))
+      (helpers/wrap-return (out state zone-end) pass-duration)
+      (let [new-state
+            (if (helpers/pass? zone-begin zone-end)
+              (-> state
+                  (good-pass zone-end)
+                  (assoc :phase zone-end))
+              (-> state
+                  (bad-pass zone-end)
+                  (assoc :phase zone-end)))]
+        (helpers/wrap-return new-state pass-duration)))))
 
 (defn update-duel
   [state is-duel-won opp-player]
@@ -325,7 +345,7 @@
 
 (defn resume-game
   [state]
-  (good-pass state (helpers/choose-pass-end-zone :attack)))
+  (resume-good-pass state (helpers/choose-pass-end-zone :attack)))
 
 (defn resume-goal-out
   [state]
@@ -339,16 +359,64 @@
   [state]
   (pass-no-offside state))
 
+(def pass-duration-map
+  {:goalkeeper {:defense 1
+                :midfield 3.5
+                :attack 5}
+   :defense {:goalkeeper 1.5
+             :defense 1
+             :midfield 1.5
+             :attack 3}
+   :midfield {:goalkeeper 3.5
+              :defense 1.5
+              :midfield 1
+              :attack 1.5}
+   :attack {:goalkeeper 5
+            :defense 3
+            :midfield 1
+            :attack 0.5}})
+
+(def shot-duration-map
+  {:defense 3
+   :midfield 1.8
+   :attack 1})
+
+(def event-mapper-2
+  {:shot shot
+   :pass pass
+   :duel duel})
+
+(defn get-pass-duration
+  [zone-begin zone-end]
+  (get-in pass-duration-map [zone-begin zone-end]))
+
+(defn get-shot-duration
+  [zone-begin]
+  (get-in shot-duration-map [zone-begin]))
+
 (def phase-actions-controller
-  {:defense [pass duel]
-   :midfield [pass duel]
-   :attack [pass duel shot]
+  {:defense {:pass 0.7 :duel 0.25 :shot 0.05}
+   :midfield {:pass 0.4 :duel 0.4 :shot 0.2}
+   :attack {:pass 0.35 :duel 0.35 :shot 0.3}
    :offside [resume-offside]
    :resume [resume-game]
    :goal-out [resume-goal-out]
-   :goalkeeper [pass duel]
+   :goalkeeper {:pass 0.9 :duel 0.1}
    :out [resume-out]
    :foul [resume-foul]})
+
+(defn choose-event
+  [phase]
+  (let [r (rand)
+        actions-probs (phase phase-actions-controller)]
+    (if (= (count actions-probs) 1)
+      actions-probs
+      (loop [acc 0
+             [[action prob] & rest] actions-probs]
+        (let [new-acc (+ acc prob) ]
+          (if (or (<= r new-acc) (nil? rest))
+            (action event-mapper-2)
+            (recur new-acc rest)))))))
 
 (def zone-actions-controller
   {:defense [pass duel]

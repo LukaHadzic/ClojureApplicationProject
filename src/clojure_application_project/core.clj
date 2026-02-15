@@ -15,6 +15,15 @@
 ;        (update-in match [attacking-key :goals] inc))
 ;      match)))
 
+;(defn simulate-event
+;  [state]
+;  (let [lambda (helpers/get-lambda (:zone state))
+;        due-next-event (exp-rand lambda)
+;        event (events/choose-event (:phase state))
+;        new-state (event state)]
+;    {:state new-state
+;     :}))
+
 (defn simulate-minute
   [match]
   (let [actions-allowed (get events/phase-actions-controller (:phase match))
