@@ -16,6 +16,7 @@
   (let [state {:home {:team home :goals 0}
                :away {:team away :goals 0}
                :minute 0
+               :time 0
                :possession :home
                :zone :attack
                :phase :resume
@@ -29,6 +30,7 @@
   (let [state {:home {:team home :goals 0}
                :away {:team away :goals 0}
                :minute 0
+               :time 0
                :possession :home
                :zone :attack
                :ball-holder {}
@@ -124,7 +126,7 @@
   (> (:skill player) (rand-int 101)))
 
 (def foul-realiz-possib-map
-  {:goalkeeper {:shot 1}
+  {:goalkeeper {:pass 1}
    :defense {:pass 1}
    :midfield {:pass 0.7
               :shot 0.3}
@@ -251,12 +253,12 @@
 (defn foul?
   "Greater the strength difference between players, greater the chance for foul."
   [ball-holder opp-player]
-  (let [r (rand-int 100)
+  (let [r (rand-int 101)
         ball-holder-stgh (:strength ball-holder)
         opp-player-stgh (:strength opp-player)]
     (if (>= ball-holder-stgh opp-player-stgh)
-      (> 2 1)
-      ;(and (> r opp-player-stgh) (< r ball-holder-stgh))
+      ;(> 2 1) ;PROMENITI
+      (and (> r opp-player-stgh) (< r ball-holder-stgh))
       (and (< r opp-player-stgh) (> r ball-holder-stgh)))))
 
 (defn inc-events

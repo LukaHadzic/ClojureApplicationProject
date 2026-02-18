@@ -53,6 +53,7 @@
         ball-holder-id (:id (:ball-holder state))
         goalkeeper-id (:id (first (get-in state [opp-team :team :players :goalkeeper])))]
     (if (= (rand-int 3) 1) ; Da li ce lopta nakon parade ostati kod golmana ili otici kod nekog u odbrani
+    ;(if (= 1 1) ;PROMENITI
       (-> state
           (assoc :possession opp-team)
           (assoc :ball-holder (first (get-in state [opp-team :team :players :goalkeeper])))
@@ -82,6 +83,7 @@
         shot-duration (+ (rand) (get-shot-duration (:zone state)))
         new-state
         (if (helpers/closer-value-to-first? (:skill ball-holder) (:skill goalkeeper))
+        ;(if (true? false) ;PROMENITI
           (if (helpers/goal? (:ball-holder state))
             (goal state)
             (miss state))
@@ -183,12 +185,12 @@
     (let [zone-begin (:zone state)
           zone-end (helpers/choose-pass-end-zone zone-begin)
           pass-duration (+ (rand) (get-pass-duration zone-begin zone-end))]
-    (if (helpers/out? (:ball-holder state))
-      (helpers/wrap-return (out state zone-end) pass-duration)
-      ;(out state zone-end)
-      (if (helpers/pass? zone-begin zone-end)
-        (helpers/wrap-return (good-pass state zone-end) pass-duration)
-        (helpers/wrap-return (bad-pass state zone-end) pass-duration))))))
+      (if (helpers/out? (:ball-holder state))
+        (helpers/wrap-return (out state zone-end) pass-duration)
+        ;(out state zone-end)
+        (if (helpers/pass? zone-begin zone-end)
+          (helpers/wrap-return (good-pass state zone-end) pass-duration)
+          (helpers/wrap-return (bad-pass state zone-end) pass-duration))))))
 
 (defn pass-no-offside ;Za izvodjenje out-a napraviti pass-no-offside koji je veoma slicna fja
   [state] ;Bolje napraviti i resume-out koja ce zvati pass-no-offside
@@ -333,15 +335,17 @@
           (update-in [:log curr-team] conj :fouled)
           (update-in [:log opp-team] conj :foul)))))
 
+(declare get-duel-duration)
 (defn duel
   [state]
   (let [ball-holder (:ball-holder state)
-        opp-player (helpers/rand-opposite-player state)]
+        opp-player (helpers/rand-opposite-player state)
+        duel-duration (+ (rand 0.5) (get-duel-duration ball-holder opp-player))]
     (if (helpers/foul? ball-holder opp-player)
-      (foul state opp-player)
+      (helpers/wrap-return (foul state opp-player) duel-duration)
       (if (helpers/duel-won? ball-holder opp-player)
-        (duel-won state opp-player)
-        (duel-lost state opp-player)))))
+        (helpers/wrap-return (duel-won state opp-player) duel-duration)
+        (helpers/wrap-return (duel-lost state opp-player) duel-duration)))))
 
 (defn resume-game
   [state]
@@ -376,6 +380,17 @@
             :midfield 1
             :attack 0.5}})
 
+(defn get-duel-duration
+  [ball-holder opp-player]
+  (let [holder-str (:strength ball-holder)
+        opp-str (:strength opp-player)
+        holder-sp (:speed ball-holder)
+        opp-sp (:speed opp-player)
+        str-diff (- holder-str opp-str)
+        sp-diff (- holder-sp opp-sp)
+        diff (Math/sqrt (+ (* str-diff str-diff) (* sp-diff sp-diff)))]
+    (* 3 (Math/pow 0.96656 diff)))) ; exp regression (100:0.1s ; 0:3s)y = 3*0.9656^x -> diff:y 30:1.81s ; 25:1.28s ; 20:1.519s ; 15:1.80s...
+
 (def shot-duration-map
   {:defense 3
    :midfield 1.8
@@ -384,7 +399,12 @@
 (def event-mapper-2
   {:shot shot
    :pass pass
-   :duel duel})
+   :duel duel
+   :resume-offside resume-offside
+   :resume-game resume-game
+   :resume-goal-out resume-goal-out
+   :resume-out resume-out
+   :resume-foul resume-foul})
 
 (defn get-pass-duration
   [zone-begin zone-end]
@@ -395,28 +415,37 @@
   (get-in shot-duration-map [zone-begin]))
 
 (def phase-actions-controller
-  {:defense {:pass 0.7 :duel 0.25 :shot 0.05}
+  {:goalkeeper {:pass 0.96 :duel 0.04}
+   :defense {:pass 0.7 :duel 0.25 :shot 0.05}
    :midfield {:pass 0.4 :duel 0.4 :shot 0.2}
    :attack {:pass 0.35 :duel 0.35 :shot 0.3}
-   :offside [resume-offside]
-   :resume [resume-game]
-   :goal-out [resume-goal-out]
-   :goalkeeper {:pass 0.9 :duel 0.1}
-   :out [resume-out]
-   :foul [resume-foul]})
+   :offside {:resume-offside 1.0}
+   :resume {:resume-game 1.0}
+   :goal-out {:resume-goal-out 1.0}
+   :out {:resume-out 1.0}
+   :foul {:resume-foul 1.0}})
+
+(def zone-lambda-map
+  {:goalkeeper 0.1
+   :defense 0.2
+   :midfield 0.25
+   :attack 0.35})
+
+(defn exp-rand
+  [zone]
+  (let [zone-lambda (zone zone-lambda-map)]
+    (/ (- (Math/log (- 1 (rand)))) zone-lambda)))
 
 (defn choose-event
   [phase]
   (let [r (rand)
         actions-probs (phase phase-actions-controller)]
-    (if (= (count actions-probs) 1)
-      actions-probs
-      (loop [acc 0
-             [[action prob] & rest] actions-probs]
-        (let [new-acc (+ acc prob) ]
-          (if (or (<= r new-acc) (nil? rest))
-            (action event-mapper-2)
-            (recur new-acc rest)))))))
+    (loop [acc 0
+           [[action prob] & rest] actions-probs]
+      (let [new-acc (+ acc prob)]
+        (if (or (<= r new-acc) (nil? rest))
+          (action event-mapper-2)
+          (recur new-acc rest))))))
 
 (def zone-actions-controller
   {:defense [pass duel]
