@@ -48,6 +48,7 @@
   (let [zone (:zone state)
         duration (events/exp-rand zone)
         event (events/choose-event (:phase state))
+        ;POPRAVITI ;Ako je event out, foul, corner ili penalty, duration se ne uzima u obzir!
         return-map (event state)
         event-duration (:event-duration return-map)
         new-state (:new-state return-map)]
@@ -114,7 +115,7 @@
 ;(def el-classico-fin (simulate-match el-classico))
 
 ;(dotimes [cnt 1000]
-;  (simulate-match el-classico))
+;  (simulate-match el-classico));
 
 ;URADITI ALI PRED KRAJ
 ;Napraviti -> out, goal-out, foul, penalty

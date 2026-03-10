@@ -63,17 +63,26 @@
   [team]
   (if (= team :home) :away :home))
 
-(def opposite-zone-map
-  {:goalkeeper :attack
-   :defense :attack
-   :attack :defense
-   :midfield :midfield})
+(def opposite-zones-map
+  {:goalkeeper [:attack :penalty-box]
+   :defense [:attack]
+   :attack [:defense]
+   :midfield [:midfield]
+   :penalty-box [:defense :goalkeeper]}) ; :penalty-box <-> :goalkeeper
 
 (def next-zone-map
   {:goalkeeper :defense
    :defense :midfield
    :midfield :attack
-   :attack :attack})
+   :attack :penalty-box
+   :penalty-box :penalty-box}) ; :attack <-> :penalty-box
+
+(def zone-player-zone-mapper
+  {:goalkeeper :goalkeeper
+   :defense :defense
+   :midfield :midfield
+   :attack :attack
+   :penalty-box :attack})
 
 (defn next-zone
   [curr-zone]
@@ -86,9 +95,13 @@
             k))
         next-zone-map))
 
+(defn opposite-zones
+  [zone]
+  (zone opposite-zones-map))
+
 (defn opposite-zone
   [zone]
-  (zone opposite-zone-map))
+  (first (zone opposite-zones-map)))
 
 (defn rand-zone
   []
@@ -98,17 +111,32 @@
 ;  [state]
 ;  (rand-nth (get-in state [(:possession state) :team :players (:zone state)])))
 
+(defn resolve-player-zone
+  [zone]
+  (get zone-player-zone-mapper zone))
+
+(defn players-in-zones
+  [state team zones]
+  (mapcat #(get-in state [team :team :players %]) zones))
+
 (defn rand-opposite-player
   [state]
   (let [curr-team (:possession state)
-        curr-zone (:zone state)]
-  (rand-nth (get-in state [(opposite-team curr-team) :team :players (opposite-zone curr-zone)]))))
+        curr-zone (:zone state)
+        team (opposite-team curr-team)
+        zone (resolve-player-zone (rand-nth (get opposite-zones-map curr-zone)))]
+  (rand-nth (get-in state [team :team :players zone]))))
 
 (defn new-ball-holder
   "Does not allow player to pass himself"
-  [state team zone]
+  [state team zones]
+  (let [zones-seq (if (coll? zones) zones [zones])
+        zone (resolve-player-zone (rand-nth zones-seq))]
   (rand-nth (filter #(not= % (:ball-holder state))
-                    (get-in state [team :team :players zone]))))
+                    ;(distinct
+                    ;  (players-in-zones
+                    ;    state team (map resolve-player-zone zones-seq)))
+                    (get-in state [team :team :players zone])))))
 
 (defn new-ball-holder-2
   "Give ball possession to another player"
@@ -125,13 +153,16 @@
   [player]
   (> (:skill player) (rand-int 101)))
 
-(def foul-realiz-possib-map
+(def realiz-possib-map
   {:goalkeeper {:pass 1}
    :defense {:pass 1}
    :midfield {:pass 0.7
               :shot 0.3}
    :attack {:pass 0.25
-            :shot 0.75}})
+            :shot 0.75}
+   :corner {:pass 0.95
+            :shot 0.05}
+   :penalty-box {:shot 1}})
 
 (defn choose-pl-max-attr
   [players attr]
@@ -162,7 +193,7 @@
 (defn choose-foul-event
   [zone]
   (let [r (rand)
-        actions-probs (zone foul-realiz-possib-map)]
+        actions-probs (zone realiz-possib-map)]
     (loop [acc 0
            [[action prob] & rest] actions-probs]
       (let [new-acc (+ prob acc)]
@@ -186,11 +217,15 @@
    :midfield {:goalkeeper 0.2
               :defense 0.3
               :midfield 0.3
-              :attack 0.2}
+              :attack 0.15
+              :penalty-box 0.05}
    :attack {:goalkeeper 0.02
             :defense 0.08
             :midfield 0.45
-            :attack 0.45}})
+            :attack 0.25
+            :penalty-box 0.2}
+   :penalty-box {:attack 0.5
+                 :penalty-box 0.5}})
 
 (def good-pass-possibilities
   {:goalkeeper {:defense 0.9
@@ -203,11 +238,15 @@
    :midfield {:goalkeeper 0.9
               :defense 0.9
               :midfield 0.7
-              :attack 0.4}
+              :attack 0.4
+              :penalty-box 0.05}
    :attack {:goalkeeper 0.7
             :defense 0.5
             :midfield 0.6
-            :attack 0.33}})
+            :attack 0.33
+            :penalty-box 0.15}
+   :penalty-box {:attack 0.15
+                 :penalty-box 0.15}})
 
 (defn choose-pass-end-zone
   [from-zone]
@@ -228,7 +267,7 @@
 
 (defn offside?
   []
-  (>= (rand-int 10) 9))
+  (>= (rand-int 10) 9)) ;PROMENITI
 
 (defn out?
   [ball-holder]
@@ -260,6 +299,12 @@
       ;(> 2 1) ;PROMENITI
       (and (> r opp-player-stgh) (< r ball-holder-stgh))
       (and (< r opp-player-stgh) (> r ball-holder-stgh)))))
+
+(defn corner?
+  [] ;PROMENITI
+  (if (< 1 2)
+    false
+    true)) ;PROMENITI
 
 (defn inc-events
   [state team player-id events]

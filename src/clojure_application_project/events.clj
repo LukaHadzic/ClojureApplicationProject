@@ -16,7 +16,7 @@
   (let [team (:possession state)
         new-possession (helpers/opposite-team team)]
     (if (= event :goal)
-      (let [updated-ball-holder (helpers/new-ball-holder-2 state new-possession :attack)]
+      (let [updated-ball-holder (helpers/new-ball-holder state new-possession :attack)]
         (-> state
             (update-shot 1)
             (update-in [:log team] conj event)
@@ -52,26 +52,35 @@
         opp-team (helpers/opposite-team curr-team)
         ball-holder-id (:id (:ball-holder state))
         goalkeeper-id (:id (first (get-in state [opp-team :team :players :goalkeeper])))]
-    (if (= (rand-int 3) 1) ; Da li ce lopta nakon parade ostati kod golmana ili otici kod nekog u odbrani
-    ;(if (= 1 1) ;PROMENITI
+    (if (helpers/corner?)
       (-> state
-          (assoc :possession opp-team)
-          (assoc :ball-holder (first (get-in state [opp-team :team :players :goalkeeper])))
           (helpers/inc-events curr-team ball-holder-id [:shots-on-goal :shots])
           (helpers/inc-events opp-team goalkeeper-id [:saves])
-          (assoc :zone :goalkeeper)
-          (assoc :phase :goalkeeper)
+          (assoc :zone :attack)
+          (assoc :phase :corner)
           (update-in [:log opp-team] conj :shot-saved)
           (update-in [:log curr-team] conj :miss))
-      (-> state
-          (assoc :possession opp-team)
-          (assoc :ball-holder (helpers/new-ball-holder state opp-team :defense))
-          (helpers/inc-events curr-team ball-holder-id [:shots-on-goal :shots])
-          (helpers/inc-events opp-team goalkeeper-id [:saves])
-          (assoc :zone :defense)
-          (assoc :phase :defense)
-          (update-in [:log opp-team] conj :shot-saved)
-          (update-in [:log curr-team] conj :miss)))))
+      (if (= (rand-int 3) 1) ; Da li ce lopta nakon parade ostati kod golmana ili otici kod nekog u odbrani
+        ;(if (= 1 1) ;PROMENITI
+        (-> state
+            (assoc :possession opp-team)
+            (assoc :ball-holder (first (get-in state [opp-team :team :players :goalkeeper])))
+            (helpers/inc-events curr-team ball-holder-id [:shots-on-goal :shots])
+            (helpers/inc-events opp-team goalkeeper-id [:saves])
+            (assoc :zone :goalkeeper)
+            (assoc :phase :goalkeeper)
+            (update-in [:log opp-team] conj :shot-saved)
+            (update-in [:log curr-team] conj :miss))
+        (-> state
+            (assoc :possession opp-team)
+            (assoc :ball-holder (helpers/new-ball-holder state opp-team :defense))
+            (helpers/inc-events curr-team ball-holder-id [:shots-on-goal :shots])
+            (helpers/inc-events opp-team goalkeeper-id [:saves])
+            (assoc :zone :defense)
+            (assoc :phase :defense)
+            (update-in [:log opp-team] conj :shot-saved)
+            (update-in [:log curr-team] conj :miss))))))
+
 
 (declare get-shot-duration)
 (defn shot
@@ -112,8 +121,8 @@
               (assoc :ball-holder updated-ball-holder)
               (update-in [:log team] conj :pass)))
         ;(let [new-zone (helpers/opposite-zone state)
-        (let [new-zone (helpers/opposite-zone zone)
-              updated-ball-holder (helpers/new-ball-holder-2 state team new-zone)]
+        (let [new-zone (helpers/resolve-player-zone (rand-nth (helpers/opposite-zones zone)))
+              updated-ball-holder (helpers/new-ball-holder state team new-zone)]
           (-> state
               (update-pass 0)
               (assoc :possession team)
@@ -127,7 +136,8 @@
 (defn resume-good-pass
   [state zone-end]
   (let [team (:possession state)
-        pass-duration (+ (rand) (get-pass-duration :attack zone-end))]
+        new-end-zone (if (= :penalty-box zone-end) :attack zone-end)
+        pass-duration (+ (rand) (get-pass-duration :attack new-end-zone))]
     (helpers/wrap-return (finish-pass state zone-end team :pass) pass-duration)))
 
 (defn good-pass
@@ -147,7 +157,7 @@
         old-possession (:possession state)
         new-zone :defense
         old-zone :attack
-        new-holder (helpers/new-ball-holder-2 state new-possession new-zone)
+        new-holder (helpers/new-ball-holder state new-possession new-zone)
         offside-holder-id (:id (helpers/new-ball-holder state old-possession old-zone))]
     (-> state
         (update-pass 0)
@@ -203,11 +213,11 @@
       (let [new-state
             (if (helpers/pass? zone-begin zone-end)
               (-> state
-                  (good-pass zone-end)
-                  (assoc :phase zone-end))
+                  (good-pass zone-end))
+                  ;(assoc :phase zone-end))
               (-> state
-                  (bad-pass zone-end)
-                  (assoc :phase zone-end)))]
+                  (bad-pass zone-end)))]
+                  ;(assoc :phase (helpers/opposite-zone zone-end))))]
         (helpers/wrap-return new-state pass-duration)))))
 
 (defn update-duel
@@ -374,11 +384,15 @@
    :midfield {:goalkeeper 3.5
               :defense 1.5
               :midfield 1
-              :attack 1.5}
+              :attack 1.5
+              :penalty-box 1.5}
    :attack {:goalkeeper 5
             :defense 3
             :midfield 1
-            :attack 0.5}})
+            :attack 0.5
+            :penalty-box 0.5}
+   :penalty-box {:attack 0.5
+                 :penalty-box 0.5}})
 
 (defn get-duel-duration
   [ball-holder opp-player]
@@ -394,7 +408,8 @@
 (def shot-duration-map
   {:defense 3
    :midfield 1.8
-   :attack 1})
+   :attack 1
+   :penalty-box 0.5})
 
 (def event-mapper-2
   {:shot shot
@@ -419,17 +434,20 @@
    :defense {:pass 0.7 :duel 0.25 :shot 0.05}
    :midfield {:pass 0.4 :duel 0.4 :shot 0.2}
    :attack {:pass 0.35 :duel 0.35 :shot 0.3}
+   :penalty-box {:pass 0.1 :duel 0.5 :shot 0.4}
    :offside {:resume-offside 1.0}
    :resume {:resume-game 1.0}
    :goal-out {:resume-goal-out 1.0}
    :out {:resume-out 1.0}
-   :foul {:resume-foul 1.0}})
+   :foul {:resume-foul 1.0}
+   :corner {:resume-corner 1.0}})
 
 (def zone-lambda-map
   {:goalkeeper 0.1
    :defense 0.2
    :midfield 0.25
-   :attack 0.35})
+   :attack 0.35
+   :penalty-box 0.5})
 
 (defn exp-rand
   [zone]
