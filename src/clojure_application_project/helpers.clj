@@ -162,7 +162,7 @@
             :shot 0.75}
    :corner {:pass 0.95
             :shot 0.05}
-   :penalty-box {:shot 1}})
+   :penalty-box {:shot 0.99 :pass 0.01}})
 
 (defn choose-pl-max-attr
   [players attr]
@@ -299,6 +299,10 @@
       ;(> 2 1) ;PROMENITI
       (and (> r opp-player-stgh) (< r ball-holder-stgh))
       (and (< r opp-player-stgh) (> r ball-holder-stgh)))))
+
+(defn penalty?
+  [state]
+  (= :penalty-box (get state :zone)))
 
 (defn corner?
   [] ;PROMENITI

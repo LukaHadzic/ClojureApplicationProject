@@ -62,6 +62,7 @@
         (println (str "Zone: " (:zone state)))
         (println (str "Phase: " (:phase state)))
         (println "")
+        (if (= (:phase state) :penalty) (println "Penalty occured!"))
         (update new-state :time + duration event-duration)))))
       ;(update new-state :time + duration event-duration))))
 ;#object[clojure_application_project.events$duel 0x4aea9887 clojure_application_project.events$

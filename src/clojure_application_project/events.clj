@@ -314,6 +314,14 @@
   {:shot shot
    :pass pass})
 
+(defn resume-penalty
+  [state]
+  (let [zone (:zone state)
+        event (event-mapper (helpers/choose-foul-event zone))]
+    (-> state
+        (assoc :ball-holder (helpers/choose-pl-for-event state event))
+        (event))))
+
 (defn resume-foul
   [state]
   (let [zone (:zone state)
@@ -338,12 +346,19 @@
           (assoc :phase :foul)
           (update-in [:log curr-team] conj :foul)
           (update-in [:log opp-team] conj :fouled))
-      (-> state
-          (helpers/inc-events curr-team (:id ball-holder) [:duels :duels-won])
-          (helpers/inc-events opp-team (:id opp-player) [:duels :fouls])
-          (assoc :phase :foul)
-          (update-in [:log curr-team] conj :fouled)
-          (update-in [:log opp-team] conj :foul)))))
+      (if (helpers/penalty? state)
+        (-> state
+            (helpers/inc-events curr-team (:id ball-holder) [:duels :duels-won])
+            (helpers/inc-events opp-team (:id opp-player) [:duels :fouls])
+            (assoc :phase :penalty)
+            (update-in [:log curr-team] conj :fouled-penalty)
+            (update-in [:log opp-team] conj :foul-penalty))
+        (-> state
+            (helpers/inc-events curr-team (:id ball-holder) [:duels :duels-won])
+            (helpers/inc-events opp-team (:id opp-player) [:duels :fouls])
+            (assoc :phase :foul)
+            (update-in [:log curr-team] conj :fouled)
+            (update-in [:log opp-team] conj :foul))))))
 
 (declare get-duel-duration)
 (defn duel
@@ -351,7 +366,8 @@
   (let [ball-holder (:ball-holder state)
         opp-player (helpers/rand-opposite-player state)
         duel-duration (+ (rand 0.5) (get-duel-duration ball-holder opp-player))]
-    (if (helpers/foul? ball-holder opp-player)
+    ;(if (helpers/foul? ball-holder opp-player)
+    (if (< (rand) 0.5) ;PROMENITI
       (helpers/wrap-return (foul state opp-player) duel-duration)
       (if (helpers/duel-won? ball-holder opp-player)
         (helpers/wrap-return (duel-won state opp-player) duel-duration)
@@ -419,7 +435,8 @@
    :resume-game resume-game
    :resume-goal-out resume-goal-out
    :resume-out resume-out
-   :resume-foul resume-foul})
+   :resume-foul resume-foul
+   :resume-penalty resume-penalty})
 
 (defn get-pass-duration
   [zone-begin zone-end]
@@ -440,7 +457,8 @@
    :goal-out {:resume-goal-out 1.0}
    :out {:resume-out 1.0}
    :foul {:resume-foul 1.0}
-   :corner {:resume-corner 1.0}})
+   :corner {:resume-corner 1.0}
+   :penalty {:resume-penalty 1.0}})
 
 (def zone-lambda-map
   {:goalkeeper 0.1
