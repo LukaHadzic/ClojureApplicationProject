@@ -50,17 +50,19 @@
   [state]
   (let [curr-team (:possession state)
         opp-team (helpers/opposite-team curr-team)
-        ball-holder-id (:id (:ball-holder state))
-        goalkeeper-id (:id (first (get-in state [opp-team :team :players :goalkeeper])))]
-    (if (helpers/corner?)
+        ball-holder (:ball-holder state)
+        goalkeeper (first (get-in state [opp-team :team :players :goalkeeper]))
+        ball-holder-id (:id ball-holder)
+        goalkeeper-id (:id goalkeeper)]
+    (if (helpers/corner? ball-holder goalkeeper)
       (-> state
           (helpers/inc-events curr-team ball-holder-id [:shots-on-goal :shots])
           (helpers/inc-events opp-team goalkeeper-id [:saves])
           (assoc :zone :attack)
           (assoc :phase :corner)
-          (update-in [:log opp-team] conj :shot-saved)
-          (update-in [:log curr-team] conj :miss))
-      (if (= (rand-int 3) 1) ; Da li ce lopta nakon parade ostati kod golmana ili otici kod nekog u odbrani
+          (update-in [:log opp-team] conj :shot-saved-corner)
+          (update-in [:log curr-team] conj :corner))
+      (if (helpers/catch? ball-holder goalkeeper) ; Da li ce lopta nakon parade ostati kod golmana ili otici kod nekog u odbrani
         ;(if (= 1 1) ;PROMENITI
         (-> state
             (assoc :possession opp-team)
@@ -91,7 +93,7 @@
         goalkeeper (first (get-in state [opp-team :team :players :goalkeeper]))
         shot-duration (+ (rand) (get-shot-duration (:zone state)))
         new-state
-        (if (helpers/closer-value-to-first? (:skill ball-holder) (:skill goalkeeper))
+        (if (helpers/shot-saved? ball-holder goalkeeper)
         ;(if (true? false) ;PROMENITI
           (if (helpers/goal? (:ball-holder state))
             (goal state)
@@ -220,6 +222,46 @@
                   ;(assoc :phase (helpers/opposite-zone zone-end))))]
         (helpers/wrap-return new-state pass-duration)))))
 
+(defn kick-player
+  [state team player-id]
+  (let [positions [:goalkeeper :defense :midfield :attack]
+        players-positions (get-in state [team :team :players])
+        player (some (fn [pos]
+                       (some #(when (= (:id %) player-id) %) (pos players-positions)))
+                positions)]
+    (as-> state s
+        (update-in s [team :team :kicked-players] conj player)
+        (reduce (fn [st pos]
+                  (update-in st [team :team :players pos]
+                             #(vec (remove (fn [p] (= (:id p) player-id)) %))))
+                  s
+                  positions))
+    ))
+
+(defn get-card
+  [state team player]
+  (let [player-id (get player :id)]
+    (if (< (rand) 0.01)
+      (if (= (get player :yellow-cards) 1)
+        (-> state
+            (helpers/inc-events team player-id [:yellow-cards])
+            (helpers/inc-events team player-id [:red-card])
+            ;(kick-player player)
+            )
+        (-> state
+            (helpers/inc-events team player-id [:red-card])
+            ;(kick-player player)
+            ))
+      (if (and (> (rand) 0.01) (< (rand) 0.15))
+        (if (= (get player :yellow-cards) 1)
+          (-> state
+              (helpers/inc-events team player-id [:red-card])
+              (helpers/inc-events team player-id [:yellow-cards])
+              ;(kick-player player)
+              )
+          (helpers/inc-events state team player-id [:yellow-cards]))
+        state))))
+
 (defn update-duel
   [state is-duel-won opp-player]
   (let [curr-team (:possession state)
@@ -318,6 +360,13 @@
   [state]
   (let [zone (:zone state)
         event (event-mapper (helpers/choose-foul-event zone))]
+    (-> state
+        (assoc :ball-holder (helpers/choose-pl-for-event state event))
+        (event))))
+
+(defn resume-corner
+  [state]
+  (let [event (event-mapper (helpers/choose-foul-event :corner))]
     (-> state
         (assoc :ball-holder (helpers/choose-pl-for-event state event))
         (event))))
@@ -436,6 +485,7 @@
    :resume-goal-out resume-goal-out
    :resume-out resume-out
    :resume-foul resume-foul
+   :resume-corner resume-corner
    :resume-penalty resume-penalty})
 
 (defn get-pass-duration

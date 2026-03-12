@@ -1,15 +1,25 @@
 (ns clojure-application-project.helpers)
 
 (defn make-player
-  [id name skill]
+  [id name skill
+   goal-keeping defense passing attack
+   handling reflexes positioning
+   technique shot-power finishing
+   strength speed]
   {:id id :name name :skill skill
-   :goal-keeping 96 :defense 96 :passing 96 :strength 96 :finishing 96 :attack 96 :speed 96
+   :goal-keeping goal-keeping :defense defense :passing passing :attack attack
+   :handling handling :reflexes reflexes :positioning positioning
+   :technique technique :shot-power shot-power :finishing finishing
+   :strength strength :speed speed
    :saves 0 :passes 0 :good-passes 0
-   :shots 0 :shots-on-goal 0 :goals 0 :duels 0 :duels-won 0 :offsides 0 :fouls 0})
+   :shots 0 :shots-on-goal 0 :goals 0
+   :duels 0 :duels-won 0
+   :offsides 0
+   :fouls 0 :yellow-cards 0 :red-card 0})
 
 (defn make-team
   [name players-and-positions]
-  {:name name :players players-and-positions})
+  {:name name :players players-and-positions :kicked-players {}})
 
 (defn make-match
   [home away]
@@ -149,10 +159,6 @@
   [team]
     (apply concat (vals (:players (:team team)))))
 
-(defn goal?
-  [player]
-  (> (:skill player) (rand-int 101)))
-
 (def realiz-possib-map
   {:goalkeeper {:pass 1}
    :defense {:pass 1}
@@ -259,6 +265,37 @@
           zone
           (recur new-acc rest))))))
 
+(defn get-goal-prob
+  [delta]
+  (if (> delta 20)
+    0.9
+    (if (> delta 0)
+      0.6
+      (if (> delta -20)
+        0.3
+        0.1))))
+
+(defn shot-saved?
+  [shooter goalkeeper]
+  (let [shot-quality  (+ (* 0.5 (:finishing shooter))
+                         (* 0.3 (:technique shooter))
+                         (* 0.2 (:shot-power shooter)))
+        save-quality  (+ (* 0.5 (:positioning goalkeeper))
+                         (* 0.3 (:reflexes goalkeeper))
+                         (* 0.2 (:handling goalkeeper)))
+        save-prob  (- 1 (get-goal-prob (- shot-quality save-quality)))
+        r (rand)]
+    (< r save-prob)))
+
+(defn goal?
+  [shooter]
+  (let [shot-quality  (+ (* 0.5 (:finishing shooter))
+                         (* 0.3 (:technique shooter))
+                         (* 0.2 (:shot-power shooter)))
+        goal-prob (get-goal-prob (/ shot-quality 4))
+        r (rand)]
+    (< r goal-prob)))
+
 (defn pass?
   [zone-begin zone-end]
   (let [r (rand)
@@ -305,10 +342,28 @@
   (= :penalty-box (get state :zone)))
 
 (defn corner?
-  [] ;PROMENITI
-  (if (< 1 2)
-    false
-    true)) ;PROMENITI
+  [shooter goalkeeper]
+  (let [shot-quality  (+ (* 0.5 (:finishing shooter))
+                         (* 0.3 (:technique shooter))
+                         (* 0.2 (:shot-power shooter)))
+        save-quality  (+ (* 0.5 (:positioning goalkeeper))
+                         (* 0.3 (:reflexes goalkeeper))
+                         (* 0.2 (:handling goalkeeper)))
+        corner-prob  (get-goal-prob (- shot-quality save-quality))
+        r (rand)]
+    (< r corner-prob)))
+
+(defn catch?
+  [shooter goalkeeper]
+  (let [shot-quality  (+ (* 0.5 (:finishing shooter))
+                         (* 0.3 (:technique shooter))
+                         (* 0.2 (:shot-power shooter)))
+        save-quality  (+ (* 0.5 (:positioning goalkeeper))
+                         (* 0.3 (:reflexes goalkeeper))
+                         (* 0.2 (:handling goalkeeper)))
+        catch-prob  (- 1 (get-goal-prob (- shot-quality save-quality)))
+        r (rand)]
+    (< r catch-prob)))
 
 (defn inc-events
   [state team player-id events]
@@ -323,6 +378,10 @@
                                                p events)
                                        p))
                                    players))))))
+
+(defn should-get-card?
+  [fouled-player player]
+  (< (rand) 0.3)) ;PROMENITI
 
 (defn count-event
   [team event]
