@@ -16,7 +16,7 @@
   (let [team (:possession state)
         new-possession (helpers/opposite-team team)]
     (if (= event :goal)
-      (let [updated-ball-holder (helpers/new-ball-holder state new-possession :attack)]
+      (let [updated-ball-holder (helpers/new-ball-holder-resume-game state new-possession :attack)]
         (-> state
             (update-shot 1)
             (update-in [:log team] conj event)
@@ -63,7 +63,6 @@
           (update-in [:log opp-team] conj :shot-saved-corner)
           (update-in [:log curr-team] conj :corner))
       (if (helpers/catch? ball-holder goalkeeper) ; Da li ce lopta nakon parade ostati kod golmana ili otici kod nekog u odbrani
-        ;(if (= 1 1) ;PROMENITI
         (-> state
             (assoc :possession opp-team)
             (assoc :ball-holder (first (get-in state [opp-team :team :players :goalkeeper])))
@@ -73,15 +72,16 @@
             (assoc :phase :goalkeeper)
             (update-in [:log opp-team] conj :shot-saved)
             (update-in [:log curr-team] conj :miss))
+        (let [{team :team zone :zone player :player opposite :opposite?} (helpers/new-ball-holder-safe state opp-team :defense)]
         (-> state
-            (assoc :possession opp-team)
-            (assoc :ball-holder (helpers/new-ball-holder state opp-team :defense))
-            (helpers/inc-events curr-team ball-holder-id [:shots-on-goal :shots])
+            (assoc :possession team)
+            (assoc :ball-holder player)
+            (helpers/inc-events team (:id player) [:shots-on-goal :shots])
             (helpers/inc-events opp-team goalkeeper-id [:saves])
-            (assoc :zone :defense)
-            (assoc :phase :defense)
+            (assoc :zone zone)
+            (assoc :phase zone)
             (update-in [:log opp-team] conj :shot-saved)
-            (update-in [:log curr-team] conj :miss))))))
+            (update-in [:log curr-team] conj :miss)))))))
 
 
 (declare get-shot-duration)
@@ -94,7 +94,7 @@
         shot-duration (+ (rand) (get-shot-duration (:zone state)))
         new-state
         (if (helpers/shot-saved? ball-holder goalkeeper)
-        ;(if (true? false) ;PROMENITI
+        ;(if (true? false)
           (if (helpers/goal? (:ball-holder state))
             (goal state)
             (miss state))
@@ -102,56 +102,99 @@
     (helpers/wrap-return new-state shot-duration)))
 
 (defn update-pass
-  [state is-good-pass]
+  [state is-pass-good?]
   (let [curr-team (:possession state)
         ball-holder-id (:id (:ball-holder state))]
-    (if (= is-good-pass 1)
+    (if is-pass-good?
       (-> state
           (helpers/inc-events curr-team ball-holder-id [:passes :good-passes]))
       (-> state
           (helpers/inc-events curr-team ball-holder-id [:passes])))))
 
 (defn finish-pass
-  [state zone team log-text]
-      (if (= log-text :pass)
-        (let [updated-ball-holder (helpers/new-ball-holder state team zone)]
-          (-> state
-              (update-pass 1)
-              (assoc :possession team)
-              (assoc :zone zone)
-              (assoc :phase zone)
-              (assoc :ball-holder updated-ball-holder)
-              (update-in [:log team] conj :pass)))
-        ;(let [new-zone (helpers/opposite-zone state)
-        (let [new-zone (helpers/resolve-player-zone (rand-nth (helpers/opposite-zones zone)))
-              updated-ball-holder (helpers/new-ball-holder state team new-zone)]
-          (-> state
-              (update-pass 0)
-              (assoc :possession team)
-              (assoc :zone new-zone)
-              (assoc :phase new-zone)
-              (assoc :ball-holder updated-ball-holder)
-              (update-in [:log team] conj :ball-won)
-              (update-in [:log (helpers/opposite-team team)] conj :ball-lost)))))
+  [state pass-end-team pass-end-zone pass-end-player is-pass-good?]
+  (let [new-state (if is-pass-good?
+                    (-> state
+                        (update-pass true)
+                        (update-in [:log pass-end-team] conj :pass))
+                    (-> state
+                        (update-pass false)
+                        (update-in [:log pass-end-team] conj :pass-ball-won)
+                        (update-in [:log (helpers/opposite-team pass-end-team)] conj :pass-ball-lost)))]
+    (-> new-state
+        (assoc :possession pass-end-team)
+        (assoc :zone pass-end-zone)
+        (assoc :phase pass-end-zone)
+        (assoc :ball-holder pass-end-player))))
 
+      ;(if (= log-text :pass)
+      ;  (let [updated-ball-holder end-player]
+      ;    (-> state
+      ;        (update-pass 1)
+      ;        (assoc :possession team)
+      ;        (assoc :zone zone)
+      ;        (assoc :phase zone)
+      ;        (assoc :ball-holder updated-ball-holder)
+      ;        (update-in [:log team] conj :pass)))
+      ;  ;(let [new-zone (helpers/opposite-zone state)
+      ;  (let [new-zone (helpers/resolve-player-zone (rand-nth (helpers/opposite-zones zone)))
+      ;        updated-ball-holder end-player]
+      ;    (-> state
+      ;        (update-pass 0)
+      ;        (assoc :possession team)
+      ;        (assoc :zone new-zone)
+      ;        (assoc :phase new-zone)
+      ;        (assoc :ball-holder updated-ball-holder)
+      ;        (update-in [:log team] conj :ball-won)
+      ;        (update-in [:log (helpers/opposite-team team)] conj :ball-lost)))))
+
+;PROMENITI
 (declare get-pass-duration)
 (defn resume-good-pass
   [state zone-end]
   (let [team (:possession state)
         new-end-zone (if (= :penalty-box zone-end) :attack zone-end)
+        end-player (helpers/new-ball-holder-resume-game state team new-end-zone)
         pass-duration (+ (rand) (get-pass-duration :attack new-end-zone))]
-    (helpers/wrap-return (finish-pass state zone-end team :pass) pass-duration)))
+    (helpers/wrap-return (finish-pass state team zone-end end-player :pass) pass-duration)))
 
-(defn good-pass
+(declare get-pass-duration)
+(defn handle-good-pass
   ;"Pass is good, choose player from pass-end zone for new ball holder"
   [state zone-end]
-  (let [team (:possession state)]
-    (finish-pass state zone-end team :pass)))
+  (let [team (:possession state)
+        zone-begin (:zone state)
+        {pass-end-team :team pass-end-zone :zone
+         pass-end-player :player opposite? :opposite?} (helpers/new-ball-holder-safe state team zone-end)]
+    ;PROMENITI ako iz :attack ide los pas u opp :goalkeeper vreme ce biti veoma dugacko umesto veoma kratko
+    ; potencijalno ubaciti opposite? u igru
+    (do
+      (prn "Pozvao se handle-good-pass, new-holder: " (:name pass-end-player))
+      (prn "PASS-END-TEAM: " pass-end-team)
+      (prn "PASS-END-ZONE: " pass-end-zone)
+      (prn "PASS-END-PLAYER: " (:name pass-end-player))
+      (if opposite?
+        (helpers/wrap-return (finish-pass state pass-end-team pass-end-zone pass-end-player false) (get-pass-duration zone-begin (helpers/opposite-zone pass-end-zone)))
+        (helpers/wrap-return (finish-pass state pass-end-team pass-end-zone pass-end-player true) (get-pass-duration zone-begin pass-end-zone))))))
 
-(defn bad-pass
+(declare get-pass-duration)
+(defn handle-bad-pass
   [state zone-end]
-  (let [team (helpers/opposite-team (:possession state))]
-    (finish-pass state zone-end team :ball-won)))
+  (let [opp-team (helpers/opposite-team (:possession state))
+        zone-begin (:zone state)
+        opp-zone-end (helpers/opposite-zone zone-end)
+        {pass-end-team :team pass-end-zone :zone
+         pass-end-player :player opposite? :opposite?} (helpers/new-ball-holder-safe state opp-team opp-zone-end)]
+    ;PROMENITI ako iz :attack ide los pas u opp :goalkeeper vreme ce biti veoma dugacko umesto veoma kratko
+    ; potencijalno ubaciti opposite? u igru
+    (do
+      (prn "Pozvao se handle-bad-pass, new-holder:" (:name pass-end-player))
+      (prn "PASS-END-TEAM: " pass-end-team)
+      (prn "PASS-END-ZONE: " pass-end-zone)
+      (prn "PASS-END-PLAYER: " (:name pass-end-player))
+      (if opposite?
+        (helpers/wrap-return (finish-pass state pass-end-team pass-end-zone pass-end-player true) (get-pass-duration zone-begin pass-end-zone))
+        (helpers/wrap-return (finish-pass state pass-end-team pass-end-zone pass-end-player false) (get-pass-duration zone-begin (helpers/opposite-zone pass-end-zone)))))))
 
 (defn offside
   [state]
@@ -159,10 +202,10 @@
         old-possession (:possession state)
         new-zone :defense
         old-zone :attack
-        new-holder (helpers/new-ball-holder state new-possession new-zone)
-        offside-holder-id (:id (helpers/new-ball-holder state old-possession old-zone))]
+        new-holder (helpers/new-ball-holder-resume-game state new-possession new-zone)
+        offside-holder-id (:id (helpers/new-ball-holder-resume-game state old-possession old-zone))]
     (-> state
-        (update-pass 0)
+        (update-pass false)
         (helpers/inc-events old-possession offside-holder-id [:offsides])
         (assoc :possession new-possession)
         (assoc :ball-holder new-holder)
@@ -176,7 +219,7 @@
         old-possession (:possession state)
         new-possession (helpers/opposite-team old-possession)
         new-zone (helpers/opposite-zone zone-end)
-        new-ball-holder (helpers/new-ball-holder state new-possession new-zone)]
+        new-ball-holder (helpers/new-ball-holder-resume-game state new-possession new-zone)]
     (-> state
         (helpers/inc-events old-possession ball-holder-id [:passes])
         (assoc :possession new-possession)
@@ -189,38 +232,72 @@
 (declare get-pass-duration)
 (defn pass ;Za izvodjenje out-a napraviti pass-no-offside koji je veoma slicna fja
   [state] ;Bolje napraviti i resume-out koja ce zvati pass-no-offside
-  (if (helpers/offside?)
-    (let [event-duration (+ (rand) (get-pass-duration (:zone state) :attack))
-          new-state (offside state)]
-      (helpers/wrap-return new-state event-duration))
-    ;(offside state)
-    (let [zone-begin (:zone state)
-          zone-end (helpers/choose-pass-end-zone zone-begin)
-          pass-duration (+ (rand) (get-pass-duration zone-begin zone-end))]
-      (if (helpers/out? (:ball-holder state))
-        (helpers/wrap-return (out state zone-end) pass-duration)
-        ;(out state zone-end)
-        (if (helpers/pass? zone-begin zone-end)
-          (helpers/wrap-return (good-pass state zone-end) pass-duration)
-          (helpers/wrap-return (bad-pass state zone-end) pass-duration))))))
+  (do
+    (prn "Ulazi se u pass event")
+    (prn "PASS BALL-HOLDER: " (:name (:ball-holder state)))
+    (prn "PASS ZONE: " (:zone state))
+    (prn "PASS PHASE: " (:phase state))
+    (if (helpers/offside?)
+      (do
+        (prn "Ulazi se u OFFSIDE u pass event")
+        (let [event-duration (+ (rand) (get-pass-duration (:zone state) :attack))
+              new-state (offside state)]
+          (helpers/wrap-return new-state event-duration)))
+      ;(offside state)
+      (let [zone-begin (:zone state)
+            zone-end (helpers/choose-pass-end-zone zone-begin)
+            ball-holder (:ball-holder state)]
+        (if (helpers/out? ball-holder)
+          (do
+            (let [
+                  pass-duration (+ (rand) (get-pass-duration zone-begin zone-end))]
+              (helpers/wrap-return (out state zone-end) pass-duration)))
+          ;(out state zone-end)
+          (if (helpers/pass? zone-begin zone-end)
+              (handle-good-pass state zone-end)
+              (handle-bad-pass state zone-end)))))))
 
-(defn pass-no-offside ;Za izvodjenje out-a napraviti pass-no-offside koji je veoma slicna fja
-  [state] ;Bolje napraviti i resume-out koja ce zvati pass-no-offside
+(defn pass-no-offside
+  [state]
+  ;Zamrsena logika, prvo se bira krajnji igrac pa onda da li
+  ; je pass uspesan nezavisno od toga, mora biti povezano.
+  ; Desava se da zona i faza postavi nezavisno od ball-holder
+  ; jer se ball-holder i zone-end bira na jedan nacin, a sa good/bad-pass
+  ; postavlja phase i zone na drugi nacin, drugom logikom -> Srediti
+  ; Za pocetak promeniti logiku good/bad-pass, argumente koje salju
+  ; funkciji finish-pass, i srediti funkciju finish-pass sa
+  ; novim argumentima
+  ;(prn "PASS BALL HOLDER:" (:ball-holder state))
   (let [zone-begin (:zone state)
+        curr-team (:possession state)
         zone-end (helpers/choose-pass-end-zone zone-begin)
-        pass-duration (+ (rand) (get-pass-duration zone-begin zone-end))]
+        ball-holder (:ball-holder state)]
     (if (and (= (:phase state) :out)
-         (helpers/out? (:ball-holder state)))
-      (helpers/wrap-return (out state zone-end) pass-duration)
-      (let [new-state
-            (if (helpers/pass? zone-begin zone-end)
-              (-> state
-                  (good-pass zone-end))
-                  ;(assoc :phase zone-end))
-              (-> state
-                  (bad-pass zone-end)))]
-                  ;(assoc :phase (helpers/opposite-zone zone-end))))]
-        (helpers/wrap-return new-state pass-duration)))))
+         (helpers/out? ball-holder))
+      (let [pass-duration (+ (rand) (get-pass-duration zone-begin zone-end))]
+        (helpers/wrap-return (out state zone-end) pass-duration))
+      (if (helpers/pass? zone-begin zone-end)
+        (handle-good-pass state zone-end)
+        (handle-bad-pass state zone-end)))))
+      ;(let [new-state
+      ;      (if (helpers/pass? zone-begin zone-end)
+      ;        (-> state
+      ;            (good-pass zone-end end-player))
+      ;            ;(assoc :phase zone-end))
+      ;        (-> state
+      ;            (bad-pass zone-end end-player)))]
+      ;            ;(assoc :phase (helpers/opposite-zone zone-end))))]
+      ;  (helpers/wrap-return new-state pass-duration)))))
+
+(defn set-new-goalkeeper
+  [state team]
+  (let [new-goalkeeper (helpers/choose-pl-max-attr
+                 (helpers/players-in-zones
+                   state team [:defense :midfield :attack]) :goal-keeping)
+        new-goalkeeper-id (:id new-goalkeeper)]
+    (-> state
+        (update-in [team :team :players :goalkeeper] conj new-goalkeeper)
+        (helpers/remove-from-zone team [:defense :midfield :attack] new-goalkeeper-id))))
 
 (defn kick-player
   [state team player-id]
@@ -228,38 +305,47 @@
         players-positions (get-in state [team :team :players])
         player (some (fn [pos]
                        (some #(when (= (:id %) player-id) %) (pos players-positions)))
-                positions)]
-    (as-> state s
-        (update-in s [team :team :kicked-players] conj player)
-        (reduce (fn [st pos]
-                  (update-in st [team :team :players pos]
-                             #(vec (remove (fn [p] (= (:id p) player-id)) %))))
-                  s
-                  positions))
-    ))
+                positions)
+        goalkeeper? (= player-id (:id (first (get-in state [team :team :players :goalkeeper]))))]
+    (-> state
+        (update-in [team :team :kicked-players] conj player)
+        ;(reduce (fn [st pos]
+        ;          (update-in st [team :team :players pos]
+        ;                     #(vec (remove (fn [p] (= (:id p) player-id)) %))))
+        ;        s
+        ;        positions))
+        (helpers/remove-from-zone team positions player-id)
+        (cond->
+          goalkeeper? (set-new-goalkeeper team)))))
 
 (defn get-card
   [state team player]
   (let [player-id (get player :id)]
-    (if (< (rand) 0.01)
+    ;(if (< (rand) 0.01)
+    (if (< (rand) 0.1) ;PROMENITI
       (if (= (get player :yellow-cards) 1)
         (-> state
             (helpers/inc-events team player-id [:yellow-cards])
             (helpers/inc-events team player-id [:red-card])
-            ;(kick-player player)
-            )
+            (update-in [:log team] conj :yellow-card)
+            (update-in [:log team] conj :red-card)
+            (kick-player team player-id))
         (-> state
             (helpers/inc-events team player-id [:red-card])
-            ;(kick-player player)
-            ))
-      (if (and (> (rand) 0.01) (< (rand) 0.15))
+            (update-in [:log team] conj :red-card)
+            (kick-player team player-id)))
+      ;(if (and (> (rand) 0.01) (< (rand) 0.15))
+      (if (and (> (rand) 0.1) (< (rand) 0.3)) ;PROMENITI
         (if (= (get player :yellow-cards) 1)
           (-> state
-              (helpers/inc-events team player-id [:red-card])
               (helpers/inc-events team player-id [:yellow-cards])
-              ;(kick-player player)
-              )
-          (helpers/inc-events state team player-id [:yellow-cards]))
+              (helpers/inc-events team player-id [:red-card])
+              (update-in [:log team] conj :yellow-card)
+              (update-in [:log team] conj :red-card)
+              (kick-player team player-id))
+          (-> state
+              (helpers/inc-events team player-id [:yellow-cards])
+              (update-in [:log team] conj :yellow-card)))
         state))))
 
 (defn update-duel
@@ -314,23 +400,24 @@
 ;                 :ball-holder opp-player))))))
 
 (defn finish-duel
-  [state is-duel-won opp-player]
+  [state is-duel-won opp-player cross-next-zone?]
   (if (= is-duel-won 1)
     (let [current-team (:possession state)
           diff-team (helpers/opposite-team current-team)]
-      (if (<= (rand-int 3) 1)
+      (if cross-next-zone?
         ;(if (<= (rand-int 3) -1)
         ;(if (> (helpers/closer-value-to-first? (:speed ball-holder) (:speed opp-player)))
         (-> state
             (update-duel 1 opp-player)
-            (update-in [:log current-team] conj :duel-won)
-            (update-in [:log diff-team] conj :duel-lost))
-        (-> state
-            (update-duel 1 opp-player)
+            (helpers/inc-events current-team (:id (:ball-holder state)) [:crosses])
             (update-in [:log current-team] conj :duel-won)
             (update-in [:log diff-team] conj :duel-lost)
             (assoc :zone (helpers/next-zone (:zone state)))
-            (assoc :phase (helpers/next-zone (:zone state))))))
+            (assoc :phase (helpers/next-zone (:zone state))))
+        (-> state
+            (update-duel 1 opp-player)
+            (update-in [:log current-team] conj :duel-won)
+            (update-in [:log diff-team] conj :duel-lost))))
     (let [old-possession (:possession state)
           new-possession (helpers/opposite-team old-possession)
           ;new-zone (helpers/opposite-zone state)]
@@ -345,12 +432,12 @@
                  :ball-holder opp-player)))))
 
 (defn duel-won
-  [state opp-player]
-  (finish-duel state 1 opp-player))
+  [state opp-player cross-next-zone?]
+  (finish-duel state 1 opp-player cross-next-zone?))
 
 (defn duel-lost
   [state opp-player]
-  (finish-duel state 0 opp-player))
+  (finish-duel state 0 opp-player false))
 
 (def event-mapper
   {:shot shot
@@ -386,41 +473,62 @@
         opp-team (helpers/opposite-team curr-team)
         new-zone (helpers/opposite-zone (:zone state))]
     (if (helpers/foul-attack? ball-holder opp-player)
-      (-> state
-          (helpers/inc-events curr-team (:id ball-holder) [:fouls :duels])
-          (helpers/inc-events opp-team (:id opp-player) [:duels :duels-won])
-          (assoc :ball-holder opp-player)
-          (assoc :possession opp-team)
-          (assoc :zone new-zone)
-          (assoc :phase :foul)
-          (update-in [:log curr-team] conj :foul)
-          (update-in [:log opp-team] conj :fouled))
-      (if (helpers/penalty? state)
-        (-> state
-            (helpers/inc-events curr-team (:id ball-holder) [:duels :duels-won])
-            (helpers/inc-events opp-team (:id opp-player) [:duels :fouls])
-            (assoc :phase :penalty)
-            (update-in [:log curr-team] conj :fouled-penalty)
-            (update-in [:log opp-team] conj :foul-penalty))
-        (-> state
-            (helpers/inc-events curr-team (:id ball-holder) [:duels :duels-won])
-            (helpers/inc-events opp-team (:id opp-player) [:duels :fouls])
+      (let [new-state (if (helpers/should-get-card? opp-player ball-holder)
+                        (get-card state curr-team ball-holder)
+                        state)]
+        (-> new-state
+            (helpers/inc-events curr-team (:id ball-holder) [:fouls :duels])
+            (helpers/inc-events opp-team (:id opp-player) [:duels :duels-won])
+            (assoc :ball-holder opp-player)
+            (assoc :possession opp-team)
+            (assoc :zone new-zone)
             (assoc :phase :foul)
-            (update-in [:log curr-team] conj :fouled)
-            (update-in [:log opp-team] conj :foul))))))
+            (update-in [:log curr-team] conj :foul)
+            (update-in [:log opp-team] conj :fouled)))
+      (let [new-state (if (helpers/should-get-card? ball-holder opp-player)
+                        (get-card state opp-team opp-player)
+                        state)]
+        (if (helpers/penalty? new-state)
+            (-> new-state
+                (helpers/inc-events curr-team (:id ball-holder) [:duels :duels-won])
+                (helpers/inc-events opp-team (:id opp-player) [:duels :fouls])
+                (assoc :phase :penalty)
+                (update-in [:log curr-team] conj :fouled-penalty)
+                (update-in [:log opp-team] conj :foul-penalty))
+            (-> new-state
+                (helpers/inc-events curr-team (:id ball-holder) [:duels :duels-won])
+                (helpers/inc-events opp-team (:id opp-player) [:duels :fouls])
+                (assoc :phase :foul)
+                (update-in [:log curr-team] conj :fouled)
+                (update-in [:log opp-team] conj :foul)))))))
 
 (declare get-duel-duration)
+(declare get-cross-duration)
 (defn duel
   [state]
   (let [ball-holder (:ball-holder state)
-        opp-player (helpers/rand-opposite-player state)
-        duel-duration (+ (rand 0.5) (get-duel-duration ball-holder opp-player))]
+        current-team (:possession state)
+        opp-team (helpers/opposite-team (:possession state))
+        opp-zone (helpers/opposite-zone (:zone state))
+        opp-player (helpers/rand-player state opp-team opp-zone)]
     ;(if (helpers/foul? ball-holder opp-player)
-    (if (< (rand) 0.5) ;PROMENITI
-      (helpers/wrap-return (foul state opp-player) duel-duration)
-      (if (helpers/duel-won? ball-holder opp-player)
-        (helpers/wrap-return (duel-won state opp-player) duel-duration)
-        (helpers/wrap-return (duel-lost state opp-player) duel-duration)))))
+    (if opp-player
+      (let [duel-duration (+ (rand 0.5) (get-duel-duration ball-holder opp-player))
+            cross-next-zone? (> (rand) 0.5)] ;PROMENITI staviti neku logiku
+        (if (< (rand) 0.5) ;PROMENITI
+          (helpers/wrap-return (foul state opp-player) duel-duration)
+          (if (helpers/duel-won? ball-holder opp-player)
+            (helpers/wrap-return (duel-won state opp-player cross-next-zone?) duel-duration)
+            (helpers/wrap-return (duel-lost state opp-player) duel-duration))))
+      (let [duel-duration (get-cross-duration ball-holder)
+            next-zone (helpers/next-zone (:zone state))] ;PROMENITI - staviti logiku vezanu za speed
+        (helpers/wrap-return
+          (-> state
+              (update-in [:log current-team] conj :cross)
+              (assoc :zone next-zone)
+              (assoc :phase next-zone)
+              (helpers/inc-events current-team (:id ball-holder) [:crosses]))
+          duel-duration)))))
 
 (defn resume-game
   [state]
@@ -431,7 +539,7 @@
   (pass (assoc state :phase :goalkeeper)))
 
 (defn resume-offside
-  [state] ;Nema ofsajda nakon ofsajda i ova fja zove pass-no-offside
+  [state]
   (pass (assoc state :phase :defense)))
 
 (defn resume-out
@@ -441,11 +549,14 @@
 (def pass-duration-map
   {:goalkeeper {:defense 1
                 :midfield 3.5
-                :attack 5}
+                :attack 5
+                :penalty-box 5.5
+                :goalkeeper 5.7} ; For opposite :goalkeeper zone
    :defense {:goalkeeper 1.5
              :defense 1
              :midfield 1.5
-             :attack 3}
+             :attack 3
+             :penalty-box 3.5}
    :midfield {:goalkeeper 3.5
               :defense 1.5
               :midfield 1
@@ -456,7 +567,10 @@
             :midfield 1
             :attack 0.5
             :penalty-box 0.5}
-   :penalty-box {:attack 0.5
+   :penalty-box {:goalkeeper 5.5
+                 :defense 3.5
+                 :midfield 1.5
+                 :attack 0.5
                  :penalty-box 0.5}})
 
 (defn get-duel-duration
@@ -469,6 +583,14 @@
         sp-diff (- holder-sp opp-sp)
         diff (Math/sqrt (+ (* str-diff str-diff) (* sp-diff sp-diff)))]
     (* 3 (Math/pow 0.96656 diff)))) ; exp regression (100:0.1s ; 0:3s)y = 3*0.9656^x -> diff:y 30:1.81s ; 25:1.28s ; 20:1.519s ; 15:1.80s...
+
+(defn get-cross-duration
+  [ball-holder]
+  (let [speed (:speed ball-holder)
+        speed-factor (- 1.0 (/ speed 200))
+        base 3
+        r (rand)]
+    (+ (* speed-factor base) r)))
 
 (def shot-duration-map
   {:defense 3

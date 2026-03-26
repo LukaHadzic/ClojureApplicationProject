@@ -13,13 +13,13 @@
    :strength strength :speed speed
    :saves 0 :passes 0 :good-passes 0
    :shots 0 :shots-on-goal 0 :goals 0
-   :duels 0 :duels-won 0
+   :duels 0 :duels-won 0 :crosses 0
    :offsides 0
    :fouls 0 :yellow-cards 0 :red-card 0})
 
 (defn make-team
   [name players-and-positions]
-  {:name name :players players-and-positions :kicked-players {}})
+  {:name name :formation {:goalkeeper 1 :defense 4 :midfield 3 :attack 3} :players players-and-positions :kicked-players {}})
 
 (defn make-match
   [home away]
@@ -87,6 +87,13 @@
    :attack :penalty-box
    :penalty-box :penalty-box}) ; :attack <-> :penalty-box
 
+(def pure-opp-zone-map
+  {:goalkeeper :attack
+   :defense :attack
+   :attack :defense
+   :midfield :midfield
+   :penalty-box :goalkeeper})
+
 (def zone-player-zone-mapper
   {:goalkeeper :goalkeeper
    :defense :defense
@@ -104,6 +111,35 @@
           (when (and (= v curr-zone) (not= k v))
             k))
         next-zone-map))
+
+(def zones-ind
+  {:goalkeeper 0
+   :defense 1
+   :midfield 2
+   :attack 3
+   :penalty-box 4})
+
+(declare opposite-zone)
+(defn forward?
+  [zone-begin zone-end opposite?]
+  (let [zone-end-nom (if opposite? (opposite-zone zone-end) zone-end)]
+    (if (= zone-begin nil)
+      (println "ZONE BEGIN JE NIL")
+      (if (= zone-end nil)
+        (println "ZONE END JE NIL")
+        (>= (get zones-ind zone-end-nom) (get zones-ind zone-begin))))))
+
+
+(defn last-zone?
+  [zone is-forward opposite?]
+  (if opposite?
+    (if is-forward
+      (= zone :goalkeeper)
+      (= zone :penalty-box))
+    (if is-forward
+      (= zone :penalty-box)
+      (= zone :goalkeeper))))
+
 
 (defn opposite-zones
   [zone]
@@ -127,7 +163,15 @@
 
 (defn players-in-zones
   [state team zones]
-  (mapcat #(get-in state [team :team :players %]) zones))
+  (mapcat #(get-in state [team :team :players %]) (distinct (map resolve-player-zone zones))))
+
+(defn remove-from-zone
+  [state team zones player-id]
+  (reduce (fn [st pos]
+            (update-in st [team :team :players pos]
+                       #(vec (remove (fn [p] (= (:id p) player-id)) %))))
+          state
+          zones))
 
 (defn rand-opposite-player
   [state]
@@ -137,16 +181,103 @@
         zone (resolve-player-zone (rand-nth (get opposite-zones-map curr-zone)))]
   (rand-nth (get-in state [team :team :players zone]))))
 
+(defn rand-player
+  [state team zone]
+  (let [ind (rand-int (+ 1 (get-in state [team :team :formation zone])))
+        players-in-zone (get-in state [team :team :players (resolve-player-zone zone)])]
+    (nth players-in-zone ind nil)))
+
+(defn new-ball-holder-resume-game
+  [state team zone]
+  (let [zone (resolve-player-zone zone)
+        players (filter #(not= % (:ball-holder state))
+                        ;(distinct
+                        ;  (players-in-zones
+                        ;    state team (map resolve-player-zone zones-seq)))
+                        (get-in state [team :team :players zone]))]
+    (if (seq players)
+      (rand-nth players)
+      (new-ball-holder-resume-game state team (prev-zone zone)))))
+
+;Problem je sto new-ball-holder-safe moze da izabere golmana ponovo - kako?
+;Problem je sto moze da bude IndexOutOfBoundsException - kako?
+  ;Na tragu: kada se doda golmanu? -> Ostaje samo ovo resiti jos
+;Ovde je problem sa next-zone-temp iz koje se bira sledeci,
+; a isto tako i u timu koji prosledjujemo za sledecu iteraciju
+; rekurzije
+(declare new-ball-holder)
+(defn new-ball-holder-safe
+  [state team zone]
+  (prn "NBHS pocetak" team zone)
+  (let [player (new-ball-holder state team zone)
+        opposite? (not= (:possession state) team)
+        is-forward (forward? (:zone state) zone opposite?)
+        next-zone-temp
+          (if opposite?
+            (if is-forward
+              (prev-zone zone)
+              (next-zone zone))
+            (if is-forward
+              (next-zone zone)
+              (prev-zone zone)))]
+    ;(prn "NBHS: player" player)
+    (prn "NBHS: is-forward" is-forward)
+    ;(prn "NBHS: next-zone-temp" next-zone-temp)
+    (if player
+      {:team team :zone zone :player player :opposite? false}
+      (let [opp-team (opposite-team team)
+            opp-zone (resolve-player-zone (get pure-opp-zone-map zone))
+            opp-player (rand-player state opp-team opp-zone)]
+        ;(prn "NBHS: opp-team" opp-team)
+        ;(prn "NBHS: opp-zone" opp-zone)
+        ;(prn "NBHS: opp-player" opp-player)
+        (if opp-player
+          (do
+            {:team opp-team :zone opp-zone :player opp-player :opposite? true})
+        ;Mozda proslediti opp-zone a ne zone?
+          ;Treba staviti guard-ove za end-zones da
+          ; ne moze sledeca da bude nil, uvek
+          ; mora da se zavrsi u :goalkeeper najdalje
+          (if (last-zone? zone is-forward opposite?)
+            ;FORCED PICK
+            (let [from-team (if opposite?
+                              (if is-forward
+                                team
+                                opp-team)
+                              (if is-forward
+                                opp-team
+                                team))]
+              (do
+                (prn "Ulazi se u forced pick")
+                (let [forced-opp-player (rand-nth (players-in-zones state from-team [:goalkeeper]))]
+                  (prn "Odabrano je:" forced-opp-player)
+                  {:team from-team :zone :goalkeeper :player forced-opp-player :opposite? true})))
+
+            ;RADI
+            ;(do
+            ;  (prn "Ulazi se u forced pick")
+            ;  (let [forced-opp-player (rand-nth (players-in-zones state opp-team [opp-zone]))]
+            ;    (prn "Odabrano je:" forced-opp-player)
+            ;    {:team opp-team :zone opp-zone :player forced-opp-player :opposite? true}))
+            ;RADI
+            (new-ball-holder-safe state team next-zone-temp)))))))
+
+          ;(new-ball-holder-safe state team next-zone-temp)))))))
+
 (defn new-ball-holder
   "Does not allow player to pass himself"
   [state team zones]
   (let [zones-seq (if (coll? zones) zones [zones])
-        zone (resolve-player-zone (rand-nth zones-seq))]
-  (rand-nth (filter #(not= % (:ball-holder state))
-                    ;(distinct
-                    ;  (players-in-zones
-                    ;    state team (map resolve-player-zone zones-seq)))
-                    (get-in state [team :team :players zone])))))
+        zone (resolve-player-zone (rand-nth zones-seq))
+        players (filter #(not= (:id %) (:id (:ball-holder state)))
+                        ;(distinct
+                        ;  (players-in-zones
+                        ;    state team (map resolve-player-zone zones-seq)))
+                        (get-in state [team :team :players zone]))]
+    (when (seq players)
+      ;(rand-nth players))))
+      (rand-nth (conj players nil)))))
+
 
 (defn new-ball-holder-2
   "Give ball possession to another player"
@@ -381,6 +512,10 @@
 
 (defn should-get-card?
   [fouled-player player]
+  ;Vratiti i koji karton dobija!
+  (let [fouled-stgh (:strength fouled-player)
+        player-stgh (:strength player)
+        ])
   (< (rand) 0.3)) ;PROMENITI
 
 (defn count-event

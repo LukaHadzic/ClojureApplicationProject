@@ -55,14 +55,21 @@
     (if (nil? new-state)
       (println "new state je nil")
       (do
-        (println (str "Event: " event))
-        (println (str "Ball holder: " (:ball-holder state)))
+        (println (str "Ball holder: " (:name (:ball-holder state))))
         (println (str "Possession: " (:possession state)))
         (println (str "Time: " (:time state)))
         (println (str "Zone: " (:zone state)))
         (println (str "Phase: " (:phase state)))
+        ;(println "")
+        (println (str "Event that occured: " event))
+        ;(println "")
+        (println (str "New Ball holder: " (:name (:ball-holder new-state))))
+        (println (str "New Possession: " (:possession new-state)))
+        (println (str "New Time: " (+ (:time state) duration event-duration)))
+        (println (str "New Zone: " (:zone new-state)))
+        (println (str "New Phase: " (:phase new-state)))
         (println "")
-        (if (= (:phase state) :penalty) (println "Penalty occured!"))
+        ;(if (= (:phase state) :penalty) (println "Penalty occured!"))
         (update new-state :time + duration event-duration))))) ;   goal-keeping defense passing attack
                                                                     ;handling reflexes positioning
                                                                     ;technique shot-power finishing
