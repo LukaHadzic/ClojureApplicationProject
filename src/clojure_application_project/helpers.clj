@@ -17,9 +17,17 @@
    :offsides 0
    :fouls 0 :yellow-cards 0 :red-card 0})
 
+(defn count-players
+  [zone players-and-positions]
+  (count (zone players-and-positions)))
+
 (defn make-team
   [name players-and-positions]
-  {:name name :formation {:goalkeeper 1 :defense 4 :midfield 3 :attack 3} :players players-and-positions :kicked-players {}})
+  {:name name :formation {:goalkeeper (count (get players-and-positions :goalkeeper))
+                          :defense (count (get players-and-positions :defense))
+                          :midfield (count (get players-and-positions :midfield))
+                          :attack (count (get players-and-positions :attack))}
+   :players players-and-positions :kicked-players {}})
 
 (defn make-match
   [home away]
@@ -224,7 +232,7 @@
     (prn "NBHS: is-forward" is-forward)
     ;(prn "NBHS: next-zone-temp" next-zone-temp)
     (if player
-      {:team team :zone zone :player player :opposite? false}
+      {:team team :zone zone :player player :opposite? opposite?} ;PROMENITI Da li ovde treba da bude :opposite opposite? ili da ostane false
       (let [opp-team (opposite-team team)
             opp-zone (resolve-player-zone (get pure-opp-zone-map zone))
             opp-player (rand-player state opp-team opp-zone)]
@@ -293,13 +301,14 @@
 (def realiz-possib-map
   {:goalkeeper {:pass 1}
    :defense {:pass 1}
-   :midfield {:pass 0.7
-              :shot 0.3}
+   :midfield {:shot 0.3
+              :pass 0.7}
    :attack {:pass 0.25
             :shot 0.75}
-   :corner {:pass 0.95
-            :shot 0.05}
-   :penalty-box {:shot 0.99 :pass 0.01}})
+   :corner {:shot 0.05
+            :pass 0.95}
+   :penalty-box {:pass 0.01
+                 :shot 0.99}})
 
 (defn choose-pl-max-attr
   [players attr]
@@ -344,9 +353,9 @@
 ;   :defense {:pass 0.7 :duel 0.25 :shot 0.05}})
 
 (def pass-possibilities
-  {:goalkeeper {:defense 0.7
-                :midfield 0.2
-                :attack 0.1}
+  {:goalkeeper {:attack 0.1
+                :defense 0.7
+                :midfield 0.2}
    :defense {:goalkeeper 0.25
              :defense 0.30
              :midfield 0.35
@@ -365,13 +374,13 @@
                  :penalty-box 0.5}})
 
 (def good-pass-possibilities
-  {:goalkeeper {:defense 0.9
+  {:goalkeeper {:attack 0.2
                 :midfield 0.75
-                :attack 0.2}
-   :defense {:goalkeeper 0.95
-             :defense 0.9
+                :defense 0.9}
+   :defense {:attack 0.2
              :midfield 0.75
-             :attack 0.2}
+             :defense 0.9
+             :goalkeeper 0.95}
    :midfield {:goalkeeper 0.9
               :defense 0.9
               :midfield 0.7
@@ -387,7 +396,8 @@
 
 (defn choose-pass-end-zone
   [from-zone]
-  (let [targets (from-zone pass-possibilities)
+  (let [targets (->> (from-zone pass-possibilities)
+                     (sort-by val))
         r (rand)]
     (loop [acc 0
            [[zone prob] & rest] targets]
@@ -510,13 +520,36 @@
                                        p))
                                    players))))))
 
+(defn get-card-prob
+  [delta]
+  (if (> delta 20)
+    {:red 0.15
+     :yellow 0.35}
+    (if (> delta 0)
+      {:red 0.07
+       :yellow 0.15}
+      (if (> delta -20)
+        {:red 0.02
+         :yellow 0.1}
+        {:red 0.005
+         :yellow 0.05}))))
+
 (defn should-get-card?
   [fouled-player player]
   ;Vratiti i koji karton dobija!
-  (let [fouled-stgh (:strength fouled-player)
-        player-stgh (:strength player)
-        ])
-  (< (rand) 0.3)) ;PROMENITI
+  (let [foul-score (- (+ (* 0.6 (:strength player))
+                         (* -0.25 (:speed player))
+                         (* -0.15 (:technique player)))
+                      (+ (* 0.6 (:strength fouled-player))
+                         (* -0.25 (:speed fouled-player))
+                         (* -0.15 (:technique fouled-player))))
+        {red-card-prob :red yellow-card-prob :yellow} (get-card-prob foul-score)
+        r (rand)]
+    (if (<= r red-card-prob)
+      {:get-card? true :card :red}
+      (if (<= r yellow-card-prob)
+        {:get-card? true :card :yellow}
+        {:get-card? false :card nil}))))
 
 (defn count-event
   [team event]

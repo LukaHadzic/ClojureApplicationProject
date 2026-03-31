@@ -94,6 +94,8 @@
         shot-duration (+ (rand) (get-shot-duration (:zone state)))
         new-state
         (if (helpers/shot-saved? ball-holder goalkeeper)
+          ;PROMENITI Desava se exception prilikom penala u shot-saved? jer se ne prosledi dobro
+          ; ball-holder ili goalkeeper? Ide duel->penalty->NPE Exception
         ;(if (true? false)
           (if (helpers/goal? (:ball-holder state))
             (goal state)
@@ -148,7 +150,6 @@
       ;        (update-in [:log team] conj :ball-won)
       ;        (update-in [:log (helpers/opposite-team team)] conj :ball-lost)))))
 
-;PROMENITI
 (declare get-pass-duration)
 (defn resume-good-pass
   [state zone-end]
@@ -166,8 +167,6 @@
         zone-begin (:zone state)
         {pass-end-team :team pass-end-zone :zone
          pass-end-player :player opposite? :opposite?} (helpers/new-ball-holder-safe state team zone-end)]
-    ;PROMENITI ako iz :attack ide los pas u opp :goalkeeper vreme ce biti veoma dugacko umesto veoma kratko
-    ; potencijalno ubaciti opposite? u igru
     (do
       (prn "Pozvao se handle-good-pass, new-holder: " (:name pass-end-player))
       (prn "PASS-END-TEAM: " pass-end-team)
@@ -185,8 +184,6 @@
         opp-zone-end (helpers/opposite-zone zone-end)
         {pass-end-team :team pass-end-zone :zone
          pass-end-player :player opposite? :opposite?} (helpers/new-ball-holder-safe state opp-team opp-zone-end)]
-    ;PROMENITI ako iz :attack ide los pas u opp :goalkeeper vreme ce biti veoma dugacko umesto veoma kratko
-    ; potencijalno ubaciti opposite? u igru
     (do
       (prn "Pozvao se handle-bad-pass, new-holder:" (:name pass-end-player))
       (prn "PASS-END-TEAM: " pass-end-team)
@@ -319,10 +316,10 @@
           goalkeeper? (set-new-goalkeeper team)))))
 
 (defn get-card
-  [state team player]
+  [state team player card]
   (let [player-id (get player :id)]
     ;(if (< (rand) 0.01)
-    (if (< (rand) 0.1) ;PROMENITI
+    (if (= card :red)
       (if (= (get player :yellow-cards) 1)
         (-> state
             (helpers/inc-events team player-id [:yellow-cards])
@@ -335,7 +332,7 @@
             (update-in [:log team] conj :red-card)
             (kick-player team player-id)))
       ;(if (and (> (rand) 0.01) (< (rand) 0.15))
-      (if (and (> (rand) 0.1) (< (rand) 0.3)) ;PROMENITI
+      (if (= card :yellow)
         (if (= (get player :yellow-cards) 1)
           (-> state
               (helpers/inc-events team player-id [:yellow-cards])
@@ -473,8 +470,10 @@
         opp-team (helpers/opposite-team curr-team)
         new-zone (helpers/opposite-zone (:zone state))]
     (if (helpers/foul-attack? ball-holder opp-player)
-      (let [new-state (if (helpers/should-get-card? opp-player ball-holder)
-                        (get-card state curr-team ball-holder)
+      (let [{should-get-card :get-card? card :card}
+            (helpers/should-get-card? opp-player ball-holder)
+            new-state (if should-get-card
+                        (get-card state curr-team ball-holder card)
                         state)]
         (-> new-state
             (helpers/inc-events curr-team (:id ball-holder) [:fouls :duels])
@@ -485,8 +484,10 @@
             (assoc :phase :foul)
             (update-in [:log curr-team] conj :foul)
             (update-in [:log opp-team] conj :fouled)))
-      (let [new-state (if (helpers/should-get-card? ball-holder opp-player)
-                        (get-card state opp-team opp-player)
+      (let [{should-get-card :get-card? card :card}
+            (helpers/should-get-card? ball-holder opp-player)
+            new-state (if should-get-card
+                        (get-card state opp-team opp-player card)
                         state)]
         (if (helpers/penalty? new-state)
             (-> new-state
@@ -514,14 +515,15 @@
     ;(if (helpers/foul? ball-holder opp-player)
     (if opp-player
       (let [duel-duration (+ (rand 0.5) (get-duel-duration ball-holder opp-player))
-            cross-next-zone? (> (rand) 0.5)] ;PROMENITI staviti neku logiku
-        (if (< (rand) 0.5) ;PROMENITI
+            cross-next-zone? (> (rand) 0.5)] ;PROMENITI staviti neku logiku da li
+            ; se prelazi u sledecu zonu
+        (if (< (rand) 0.5) ;PROMENITI - Provera da li je foul
           (helpers/wrap-return (foul state opp-player) duel-duration)
           (if (helpers/duel-won? ball-holder opp-player)
             (helpers/wrap-return (duel-won state opp-player cross-next-zone?) duel-duration)
             (helpers/wrap-return (duel-lost state opp-player) duel-duration))))
       (let [duel-duration (get-cross-duration ball-holder)
-            next-zone (helpers/next-zone (:zone state))] ;PROMENITI - staviti logiku vezanu za speed
+            next-zone (helpers/next-zone (:zone state))]
         (helpers/wrap-return
           (-> state
               (update-in [:log current-team] conj :cross)
