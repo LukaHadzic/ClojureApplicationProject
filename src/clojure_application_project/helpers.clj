@@ -67,15 +67,25 @@
 
 (defn closer-value-to-first?
   [value-1 value-2]
+  ; Nije dobro, sta ako je val-1 vece od val-2
   (let [total (+ value-1 value-2)
-        r (rand-int total)]
-    (if (< r value-1)
-      true
-      (if (> r value-2)
+        r (rand-int total)
+        in-order? (< value-1 value-2)]
+    (if in-order?
+      (if (< r value-1)
+        true
+        (if (> r value-2)
+          false
+          (if (< (- r value-1) (- value-2 r))
+            true
+            false)))
+      (if (< r value-2)
         false
-        (if (< (- r value-1) (- value-2 r))
+        (if (> r value-1)
           true
-          false)))))
+          (if (< (- r value-2) (- value-1 r))
+            false
+            true))))))
 
 (defn opposite-team
   [team]
@@ -443,9 +453,18 @@
         prob (get-in good-pass-possibilities [zone-begin zone-end])]
     (< r prob)))
 
+(def offside-chances
+  {:goalkeeper 0.2
+   :defense 0.15
+   :midfield 0.1
+   :attack 0.2
+   :penalty-box 0.3})
+
 (defn offside?
-  []
-  (>= (rand-int 10) 9)) ;PROMENITI
+  [zone-from]
+  (let [r (rand)
+        off-chance (get offside-chances zone-from)]
+  (< r off-chance)))
 
 (defn out?
   [ball-holder]
@@ -462,8 +481,7 @@
 (defn foul-attack?
   "Is attacking player made foul or it was defending player?"
   [ball-holder opp-player]
-  (let [r (rand-int 100)
-        ball-holder-stgh (:strength ball-holder)
+  (let [ball-holder-stgh (:strength ball-holder)
         opp-player-stgh (:strength opp-player)]
     (closer-value-to-first? ball-holder-stgh opp-player-stgh)))
 

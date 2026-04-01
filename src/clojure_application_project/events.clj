@@ -234,7 +234,7 @@
     (prn "PASS BALL-HOLDER: " (:name (:ball-holder state)))
     (prn "PASS ZONE: " (:zone state))
     (prn "PASS PHASE: " (:phase state))
-    (if (helpers/offside?)
+    (if (helpers/offside? (:zone state))
       (do
         (prn "Ulazi se u OFFSIDE u pass event")
         (let [event-duration (+ (rand) (get-pass-duration (:zone state) :attack))

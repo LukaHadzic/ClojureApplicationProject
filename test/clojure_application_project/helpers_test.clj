@@ -183,16 +183,19 @@
 
 (facts "Testing helpers/calc-avg function"
        (fact "Return average value of two provided values"
-             (helpers/calc-avg 1 3) => 2))
+             (helpers/calc-avg 1 3) => 2
+             (helpers/calc-avg 1 0) => 1/2
+             (helpers/calc-avg 50 100) => 75
+             (helpers/calc-avg 12 15) => 27/2))
 
 (facts "Testing helpers/closer-value-to-first? function"
        (fact "Return true if random generated number in function
        is closer to first element or false if not"
              (with-redefs [rand-int (fn [_] 85)]
-               (helpers/closer-value-to-first? 70 89) => false
+               (helpers/closer-value-to-first? 92 84) => false
                (helpers/closer-value-to-first? 87 89) => true
-               (helpers/closer-value-to-first? 55 70) => false
-               (helpers/closer-value-to-first? 80 91) => true)))
+               (helpers/closer-value-to-first? 86 70) => true
+               (helpers/closer-value-to-first? 80 89) => false)))
 
 (facts "Testing helpers/opposite-team function"
        (fact "Return opposite team of provided team"
@@ -366,7 +369,7 @@
              ;        (assoc-in [:home :team :players :attack] [])
              ;        (assoc-in [:away :team :players :defense] [])) :away :defense))
              ;=> {:team :away :zone :goalkeeper :player {:id 12 :a "a"} :opposite? true}
-             ))
+             )) ;PROMENITI
 
 (facts "Testing helpers/choose-pl-max-attr function"
        (fact "Used to find player with maximum value of provided attribute from provided collection of players."
@@ -457,7 +460,8 @@
              (with-redefs [rand (fn [] 0.99)] (helpers/choose-foul-event :penalty-box) => :shot)))
 
 (facts "Testing helpers/choose-pass-end-zone function"
-       (fact "Used to randomly pick zone that pass should end in."
+       (fact "Used to randomly pick zone that pass should end in. First key which value from (zone pass-possibilities) map
+       is bigger than random generated value is returned."
              (with-redefs [rand (fn [] 0.66)] (helpers/choose-pass-end-zone :defense)) => :midfield
 
              (with-redefs [rand (fn [] 0.7)] (helpers/choose-pass-end-zone :defense)) => :midfield
@@ -469,7 +473,7 @@
              (with-redefs [rand (fn [] 0.05)] (helpers/choose-pass-end-zone :defense))=> :attack))
 
 (facts "Testing helpers/pass? function"
-       (fact "Used to randomly decide if pass should be good or ball should be taken by opposite team."
+       (fact "If random generated value is smaller than probability from (zone-begin, zone-end) pair, true is returned."
              (with-redefs [rand (fn [] 0.1)] (helpers/pass? :midfield :penalty-box)) => false
 
              (with-redefs [rand (fn [] 0.1)] (helpers/pass? :midfield :goalkeeper)) => true
@@ -484,8 +488,22 @@
 
              (with-redefs [rand (fn [] 0.6)] (helpers/pass? :midfield :midfield)) => true))
 
-(facts "Testing helpers/out? function"
-       (fact "Used to randomly decide if pass is sent out of the pitch."
+(facts "Testing helpers/offside? function"
+       (fact "If random generated value is lower than chance that offside occurred from zone pass is sent from,
+       offside occurs and true is returned."
+             (with-redefs [rand (fn [] 0.3)] (helpers/offside? :goalkeeper)) => false
+             (with-redefs [rand (fn [] 0.1)] (helpers/offside? :goalkeeper)) => true
+             (with-redefs [rand (fn [] 0.2)] (helpers/offside? :defense)) => false
+             (with-redefs [rand (fn [] 0.12)] (helpers/offside? :defense)) => true
+             (with-redefs [rand (fn [] 0.2)] (helpers/offside? :midfield)) => false
+             (with-redefs [rand (fn [] 0.09)] (helpers/offside? :midfield)) => true
+             (with-redefs [rand (fn [] 0.3)] (helpers/offside? :attack)) => false
+             (with-redefs [rand (fn [] 0.1)] (helpers/offside? :attack)) => true
+             (with-redefs [rand (fn [] 0.35)] (helpers/offside? :penalty-box)) => false
+             (with-redefs [rand (fn [] 0.25)] (helpers/offside? :penalty-box)) => true))
+
+             (facts "Testing helpers/out? function"
+       (fact "If random generated number is greater than :passing attribute of player, ball will be sent out of the pitch (returned true)."
              (with-redefs [rand-int (fn [a] 83)] (helpers/out? {:id 22 :name "Neymar" :passing 84})) => false
 
              (with-redefs [rand-int (fn [a] 84)] (helpers/out? {:id 22 :name "Neymar" :passing 84})) => false
@@ -493,7 +511,8 @@
              (with-redefs [rand-int (fn [a] 85)] (helpers/out? {:id 22 :name "Neymar" :passing 84})) => true))
 
 (facts "Testing helpers/get-goal-prob function"
-       (fact "Used to return goal probability value based on provided value."
+       (fact "For different x value, depending of interval it belongs to, different value is returned
+       x > 20 -> 0.9 ; 0 < x < 20 -> 0.6 ; -20 < x < 0 -> 0.3 x < -20 -> 0.1."
              (helpers/get-goal-prob 21) => 0.9
              (helpers/get-goal-prob 20) => 0.6
              (helpers/get-goal-prob 19) => 0.6
@@ -503,75 +522,170 @@
              (helpers/get-goal-prob -20) => 0.1
              (helpers/get-goal-prob -21) => 0.1))
 
-             (def barcelona {:name "Barcelona",
-                 :players {:goalkeeper [{:name "Victor Valdes", :skill 87}],
-                           :defense [{:name "Dani Alves", :skill 85}
-                                     {:name "Gerard Pique", :skill 87}
-                                     {:name "Javier Mascherano", :skill 85}
-                                     {:name "Jordi Alba", :skill 83}],
-                           :midfield [{:name "Sergio Busquets", :skill 87}
-                                      {:name "Xavi", :skill 90}
-                                      {:name "Andres Iniesta", :skill 91}],
-                           :attack [{:name "Lionel Messi", :skill 94}
-                                    {:name "Pedro", :skill 85}
-                                    {:name "Neymar", :skill 87}]}})
+(facts "Testing helpers/shot-saved? function"
+       (fact "Used to decide if shot is saved by goalkeeper or not."
+             (with-redefs [rand (fn [] 0.3)]
+               (helpers/shot-saved? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86}
+                                    {:id 1 :name "Casillas" :positioning 90 :reflexes 95 :handling 92})
+               => true)
+             (with-redefs [rand (fn [] 0.6)]
+               (helpers/shot-saved? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86}
+                                    {:id 1 :name "Casillas" :positioning 90 :reflexes 95 :handling 92})
+               => true)
+             (with-redefs [rand (fn [] 0.8)]
+               (helpers/shot-saved? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86}
+                                    {:id 1 :name "Casillas" :positioning 90 :reflexes 95 :handling 92})
+               => false)))
 
-(deftest make-match-test
-  (testing "Make match"
-    (with-redefs [rand-nth (fn [_] {:name "Karim Benzema", :skill 87})]
-    (is (= match-exmpl-2 match-exmpl)))))
+(facts "Testing helpers/goal? function"
+       (fact "Used to decide if goal happened or not."
+             (with-redefs [rand (fn [] 0.3)]
+               (helpers/goal? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86})
+               => true)
+             (with-redefs [rand (fn [] 0.5)]
+               (helpers/goal? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86})
+               => true)
+             (with-redefs [rand (fn [] 0.7)]
+               (helpers/goal? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86})
+               => false)))
 
-(deftest opposite-team-test
-  (testing "Returns opposite team"
-    (is (= :away (helpers/opposite-team :home)))
-    (is (= :home (helpers/opposite-team :away)))))
+(facts "Testing helpers/duel-won? function"
+       (fact "Used to decide if pass ball holder won duel against opposite player or not. It calls
+       calc-avg helper function to calculate average value of :strength and :speed attribute. Wich avg value is rand-int
+       closer to that player won duel"
+             (with-redefs [rand-int (fn [_] 76)]
+               (helpers/duel-won?
+                  {:id 22 :name "Neymar" :strength 90 :speed 65} ;77.5
+                  {:id 4 :name "Ramos" :strength 78 :speed 85}) => true) ;81.5)
+             (with-redefs [rand-int (fn [_] 79.5)]
+               (helpers/duel-won?
+                 {:id 22 :name "Neymar" :strength 90 :speed 65} ;77.5
+                 {:id 4 :name "Ramos" :strength 78 :speed 85}) => false) ;81.5
+             (with-redefs [rand-int (fn [_] 82)]
+               (helpers/duel-won?
+                 {:id 22 :name "Neymar" :strength 90 :speed 65} ;77.5
+                 {:id 4 :name "Ramos" :strength 78 :speed 85}) => false)))
 
-(deftest new-ball-holder-2-test
-  (testing "Pick and return new ball holder"
-    (with-redefs [rand-nth (fn [coll] (first coll))]
-      (is (= {:name "Dani Alves", :skill 85}
-             (helpers/new-ball-holder-2 match-exmpl-2 :away :defense)))
-      (is (= {:name "Sami Khedira", :skill 86}
-             (helpers/new-ball-holder-2 match-exmpl-2 :home :midfield))))))
+(facts "Testing helpers/foul? function"
+       (fact "Used to decide if foul happened or not. If rand-int value is between two values of strength attributes,
+       foul occures."
+             (with-redefs [rand-int (fn [_] 82)]
+               (helpers/foul?
+                 {:id 22 :name "Neymar" :strength 90}
+                 {:id 4 :name "Ramos" :strength 78}) => true)
+             (with-redefs [rand-int (fn [_] 75)]
+               (helpers/foul?
+                 {:id 22 :name "Neymar" :strength 90}
+                 {:id 4 :name "Ramos" :strength 78}) => false)
+             (with-redefs [rand-int (fn [_] 91)]
+               (helpers/foul?
+                 {:id 22 :name "Neymar" :strength 90}
+                 {:id 4 :name "Ramos" :strength 78}) => false)
+             (with-redefs [rand-int (fn [_] 90)]
+               (helpers/foul?
+                 {:id 22 :name "Neymar" :strength 90}
+                 {:id 4 :name "Ramos" :strength 78}) => false)))
 
-(deftest get-team-players-test
-  (testing "Are team players returned correctly"
-      (let [result (helpers/get-team-players barcelona)
-            expected [{:name "Victor Valdes" :skill 87}
-                      {:name "Dani Alves" :skill 85}
-                      {:name "Gerard Pique" :skill 87}]]
-        (is (= expected (take 3 result))))))
+(facts "Testing helpers/penalty? function"
+       (fact "Used to decide if penalty happened or not. If zone is set to penalty-box when this function checks it,
+       return value is true."
+             (helpers/penalty? mock-match-test) => false
+             (helpers/penalty? (assoc mock-match-test :zone :penalty-box)) => true))
 
-(deftest goal?-test
-  (testing "Is goal logic good"
-    (with-redefs [rand-int (fn [_] 90)]
-      (is (= true (helpers/goal? {:name "Lionel Messi", :skill 94})))
-      (is (= false (helpers/goal?  {:name "Neymar", :skill 87}))))))
+(facts "Testing helpers/foul-attack? function"
+       (fact "Used to decide if ball holder is the one who made foul or not. If rand-int value is closer to ball-holder's
+       strength attribute value, ball holder made foul."
+             (with-redefs [rand-int (fn [_] 85)]
+               (helpers/foul-attack?
+                 {:id 22 :name "Neymar" :strength 90}
+                 {:id 4 :name "Ramos" :strength 78}) => true)
+             (with-redefs [rand-int (fn [_] 70)]
+               (helpers/foul-attack?
+                 {:id 22 :name "Neymar" :strength 90}
+                 {:id 4 :name "Ramos" :strength 78}) => false)
+             (with-redefs [rand-int (fn [_] 92)]
+               (helpers/foul-attack?
+                 {:id 22 :name "Neymar" :strength 90}
+                 {:id 4 :name "Ramos" :strength 78}) => true)))
 
-(deftest pass?-test
-  (testing "Is pass logic good"
-    (with-redefs [rand-int (fn [_] 90)]
-      (is (= true (helpers/pass? {:name "Lionel Messi", :skill 94})))
-      (is (= false (helpers/pass?  {:name "Neymar", :skill 87}))))))
+(facts "Testing helpers/corner? function"
+       (fact "Used to decide if corner occured after save or not."
+             (with-redefs [rand (fn [] 0.2)]
+               (helpers/corner? ;-16.5 -> 0.3
+                 {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86}
+                 {:id 1 :name "Casillas" :positioning 90 :reflexes 95 :handling 92}) => true)
+             (with-redefs [rand (fn [] 0.4)]
+               (helpers/corner? ;-16.5 -> 0.3
+                 {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86}
+                 {:id 1 :name "Casillas" :positioning 90 :reflexes 95 :handling 92}) => false)
+             (with-redefs [rand (fn [] 0.3)]
+               (helpers/corner? ;-16.5 -> 0.3
+                 {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86}
+                 {:id 1 :name "Casillas" :positioning 90 :reflexes 95 :handling 92}) => false)))
 
-(deftest new-ball-holder-test
-  (testing "Returns new ball holder after passing - must be
-  different player than current ball-holder, cannot be the same"
-    (with-redefs [rand-nth (fn [coll] (second coll))]
-      (is (not= {:name "Karim Benzema", :skill 87}
-                (helpers/new-ball-holder match-exmpl-2 :home :attack))))))
+(facts "Testing helpers/catch? function"
+       (fact "Used to decide if goalkeeper cought ball on save or not."
+             (with-redefs [rand (fn [] 0.6)]
+               (helpers/catch? ;-16.5 -> 0.3
+                 {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86}
+                 {:id 1 :name "Casillas" :positioning 90 :reflexes 95 :handling 92}) => true)
+             (with-redefs [rand (fn [] 0.8)]
+               (helpers/catch? ;-16.5 -> 0.3
+                 {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86}
+                 {:id 1 :name "Casillas" :positioning 90 :reflexes 95 :handling 92}) => false)
+             (with-redefs [rand (fn [] 0.65)]
+               (helpers/catch? ;-16.5 -> 0.3
+                 {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86}
+                 {:id 1 :name "Casillas" :positioning 90 :reflexes 95 :handling 92}) => true)))
 
-(deftest rand-zone-test
-  (testing "Returns rand-zone from list of zones in rand-zone"
-    (with-redefs [rand-nth (fn [coll] (second coll))]
-      (is (= :midfield (helpers/rand-zone))))))
+(def mock-match-test-min-players
+  {:home {:team {:players {:goalkeeper [{:id 1 :passes 0 :duels 0}] :defense [{:id 2 :passes 0 :duels 0} {:id 3 :passes 0 :duels 0}]}}}
+   :away {:team {:players {:goalkeeper [{:id 12 :passes 0 :duels 0}] :defense [{:id 13 :passes 0 :duels 0} {:id 14 :passes 0 :duels 0}]}}}
+   :minute 0 :time 0 :possession :home :zone :defense :ball-holder {:id 2 :passes 0 :duels 0} :log {:home [] :away []}})
 
-(def opp-zone-match-1 {:zone :attack})
-(def opp-zone-match-2 {:zone :midfield})
-(def opp-zone-match-3 {:zone :defense})
+(facts "Testing helpers/inc-events function"
+       (fact "Function should increment value of corresponding key provided that represents some of player's statistic
+       parameters."
+             (helpers/inc-events mock-match-test-min-players :home 2 [:passes :duels]) =>
+                                 {:home {:team {:players {:goalkeeper [{:id 1 :passes 0 :duels 0}] :defense [{:id 2 :passes 1 :duels 1} {:id 3 :passes 0 :duels 0}]}}}
+                                  :away {:team {:players {:goalkeeper [{:id 12 :passes 0 :duels 0}] :defense [{:id 13 :passes 0 :duels 0} {:id 14 :passes 0 :duels 0}]}}}
+                                  :minute 0 :time 0 :possession :home :zone :defense :ball-holder {:id 2 :passes 0 :duels 0} :log {:home [] :away []}}
+             (helpers/inc-events mock-match-test-min-players :away 13 [:duels]) =>
+             {:home {:team {:players {:goalkeeper [{:id 1 :passes 0 :duels 0}] :defense [{:id 2 :passes 0 :duels 0} {:id 3 :passes 0 :duels 0}]}}}
+              :away {:team {:players {:goalkeeper [{:id 12 :passes 0 :duels 0}] :defense [{:id 13 :passes 0 :duels 1} {:id 14 :passes 0 :duels 0}]}}}
+              :minute 0 :time 0 :possession :home :zone :defense :ball-holder {:id 2 :passes 0 :duels 0} :log {:home [] :away []}}))
 
-(deftest opposite-zone-test
-  (testing "Returns zone from opposite-zone-map"
-    (is (= :defense (helpers/opposite-zone opp-zone-match-1)))
-    (is (= :midfield (helpers/opposite-zone opp-zone-match-2)))
-    (is (= :attack (helpers/opposite-zone opp-zone-match-3)))))
+(facts "Testing helpers/get-card-prob function"
+       (fact "Based on which interval provided value belongs to, function returns corresponding map of
+       probabilities for red and yellow card"
+             (helpers/get-card-prob 21) => {:red 0.15
+                                            :yellow 0.35}
+             (helpers/get-card-prob 20) => {:red 0.07
+                                            :yellow 0.15}
+             (helpers/get-card-prob 19) => {:red 0.07
+                                            :yellow 0.15}
+             (helpers/get-card-prob 0) => {:red 0.02
+                                           :yellow 0.1}
+             (helpers/get-card-prob -1) => {:red 0.02
+                                            :yellow 0.1}
+             (helpers/get-card-prob -19) => {:red 0.02
+                                             :yellow 0.1}
+             (helpers/get-card-prob -20) => {:red 0.005
+                                             :yellow 0.05}
+             (helpers/get-card-prob -21) => {:red 0.005
+                                             :yellow 0.05}))
+
+(facts "Testing helpers/should-get-card? function"
+       (fact "Used to decide if player should get card and which."
+             (with-redefs [rand (fn [] 0.5)]
+               (helpers/should-get-card? ;-8.6 -> {:red 0.02 :yellow 0.1}
+                 {:id 22 :name "Neymar" :strength 90 :speed 65 :technique 94} ;-> 23.65
+                 {:id 4 :name "Ramos" :strength 78 :speed 85 :technique 70}) => {:get-card? false :card nil}) ;->  15.05
+             (with-redefs [rand (fn [] 0.01)]
+               (helpers/should-get-card? ;-8.6 -> {:red 0.02 :yellow 0.1}
+                 {:id 22 :name "Neymar" :strength 90 :speed 65 :technique 94} ;-> 23.65
+                 {:id 4 :name "Ramos" :strength 78 :speed 85 :technique 70}) => {:get-card? true :card :red}) ;->  15.05
+             (with-redefs [rand (fn [] 0.08)]
+               (helpers/should-get-card? ;-8.6 -> {:red 0.02 :yellow 0.1}
+                 {:id 22 :name "Neymar" :strength 90 :speed 65 :technique 94} ;-> 23.65
+                 {:id 4 :name "Ramos" :strength 78 :speed 85 :technique 70}) => {:get-card? true :card :yellow}))) ;->  15.05
