@@ -242,7 +242,7 @@
     (prn "NBHS: is-forward" is-forward)
     ;(prn "NBHS: next-zone-temp" next-zone-temp)
     (if player
-      {:team team :zone zone :player player :opposite? opposite?} ;PROMENITI Da li ovde treba da bude :opposite opposite? ili da ostane false
+      {:team team :zone zone :player player :opposite? opposite?} ;PROMENJENO Umesto :opposite? false stavljeno :opposite? opposite?
       (let [opp-team (opposite-team team)
             opp-zone (resolve-player-zone (get pure-opp-zone-map zone))
             opp-player (rand-player state opp-team opp-zone)]

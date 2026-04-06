@@ -76,7 +76,7 @@
         (-> state
             (assoc :possession team)
             (assoc :ball-holder player)
-            (helpers/inc-events team (:id player) [:shots-on-goal :shots])
+            (helpers/inc-events curr-team (:id ball-holder) [:shots-on-goal :shots]) ;PROMENJENO umesto team i player curr-team i ball-holder
             (helpers/inc-events opp-team goalkeeper-id [:saves])
             (assoc :zone zone)
             (assoc :phase zone)
@@ -97,10 +97,10 @@
           ;PROMENITI Desava se exception prilikom penala u shot-saved? jer se ne prosledi dobro
           ; ball-holder ili goalkeeper? Ide duel->penalty->NPE Exception
         ;(if (true? false)
+          (shot-saved state) ;PROMENJENO SA OVIM ISPOD SAMO REDOSLED JER AKO JE TRUE U SHOT-SAVED? ONDA SE POZIVA OVA FJA
           (if (helpers/goal? (:ball-holder state))
             (goal state)
-            (miss state))
-          (shot-saved state))]
+            (miss state)))]
     (helpers/wrap-return new-state shot-duration)))
 
 (defn update-pass

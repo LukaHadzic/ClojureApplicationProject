@@ -172,6 +172,23 @@
 ;(dotimes [cnt 1000]
 ;  (simulate-match el-classico));
 
+  ;PROBLEM KOJI SE JAVLJA:
+    ;Ball holder: Luka Modric
+    ;Possession: :home
+    ;Time: 5180.235079054371
+    ;Zone: :penalty-box
+    ;Phase: :penalty-box
+    ;Event that occured: clojure_application_project.events$duel@3cd55645
+    ;New Ball holder: Luka Modric
+    ;New Possession: :home
+    ;New Time: 5188.203894628516
+    ;New Zone: :penalty-box
+    ;New Phase: :penalty
+
+    ;Execution error (NullPointerException) at clojure-application-project.helpers/shot-saved? (helpers.clj:431).
+    ;Cannot invoke "java.lang.Number.doubleValue()" because "y" is null
+
+
 ;URADITI ALI PRED KRAJ
 ;Napraviti -> out, goal-out, foul, penalty
 ;poasonova raspodela
