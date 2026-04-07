@@ -157,7 +157,7 @@
         new-end-zone (if (= :penalty-box zone-end) :attack zone-end)
         end-player (helpers/new-ball-holder-resume-game state team new-end-zone)
         pass-duration (+ (rand) (get-pass-duration :attack new-end-zone))]
-    (helpers/wrap-return (finish-pass state team zone-end end-player :pass) pass-duration)))
+    (helpers/wrap-return (finish-pass state team new-end-zone end-player :pass) pass-duration))) ;PROMENJENO - umesto zone-end stavljeno new-end-zone
 
 (declare get-pass-duration)
 (defn handle-good-pass
