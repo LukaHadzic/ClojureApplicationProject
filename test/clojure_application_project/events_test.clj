@@ -477,7 +477,494 @@ chance for offside to happen."
                                            (assoc :phase :out)))
                => (helpers/wrap-return (events/out (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :attack) 0.4))))
 
-       ;duel
+(facts "Testing events/set-new-goalkeeper function"
+       (fact "After helper function chooses player with maximum :goal-keeping attribute, that player is set to be new
+       goalkeeper. That player is also removed from it's previous zone. Note that in this test there is side-effect,
+       in [:away :team :players] map are added :defense [] and :midfield [] key-value pairs - doesn't affect simulation."
+             (with-redefs [helpers/choose-pl-max-attr (fn [a b] {:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :saves 0})]
+               (events/set-new-goalkeeper
+                 (assoc-in mock-match-finish-shot [:away :team :players :goalkeeper] []) :away)
+               => {:home {:team
+                          {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
+                   :away {:team
+                          {:name "Barcelona" :players {:goalkeeper [{:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}]
+                                                       :defense []
+                                                       :midfield []
+                                                       :attack []}} :goals 0}
+                   :possession :home
+                   :zone :attack
+                   :phase :attack
+                   :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}
+                   :log {:home [] :away []}})))
+
+(facts "Testing events/kick-player function"
+       (fact "Player with provided id, from provided team is kicked to [team :team :kicked-players]. Note the side effect
+       for this particular test, in [:away :team :players] are added all other zones player wasn't found in, like
+       :defense [] and :midfield [] key-value pairs. This doesn't affect simulation."
+             (events/kick-player mock-match-finish-shot :away 22)
+             => {:home {:team
+                        {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
+                 :away {:team
+                        {:name "Barcelona"
+                         :players {:goalkeeper [{:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}]
+                                                     :defense []
+                                                     :midfield []
+                                                     :attack []}
+                         :kicked-players '({:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0})} :goals 0}
+                 :possession :home
+                 :zone :attack
+                 :phase :attack
+                 :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}
+                 :log {:home [] :away []}})
+       (fact "If goalkeeper is player that is kicked, automatically is called events/set-new-goalkeeper because there
+       must be one goalkeeper per team."
+             (with-redefs [helpers/choose-pl-max-attr (fn [a b] {:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :saves 0})]
+             (events/kick-player mock-match-finish-shot :away 12)
+             => {:home {:team
+                        {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
+                 :away {:team
+                        {:name "Barcelona"
+                         :players {:goalkeeper [{:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}]
+                                   :defense []
+                                   :midfield []
+                                   :attack []}
+                         :kicked-players '({:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0})} :goals 0}
+                 :possession :home
+                 :zone :attack
+                 :phase :attack
+                 :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}
+                 :log {:home [] :away []}})))
+
+(facts "Testing events/get-card function"
+       (fact "Player got red card. If player didn't have any yellow cards, only :red-card is updated and function calls
+       events/kick-player function to kick player.If player had one yellow card, :yellow-cards :red-card are updated, and
+       function calls events/kick-player function to kick player. :ball-holder map isn't updated - doesn't affect simulation."
+             (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :yellow-cards 0 :red-card 0) :away {:id 22 :name "Neymar" :yellow-cards 0 :red-card 0} :red)
+             =>
+             {:home {:team
+                       {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
+                :away {:team
+                       {:name "Barcelona"
+                        :players {:goalkeeper [{:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}]
+                                  :defense []
+                                  :midfield []
+                                  :attack []}
+                        :kicked-players '({:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :yellow-cards 0 :red-card 1})} :goals 0}
+                :possession :home
+                :zone :attack
+                :phase :attack
+                :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}
+                :log {:home [] :away [:red-card]}}
+
+             (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :yellow-cards 1 :red-card 0) :away {:id 22 :name "Neymar" :yellow-cards 1 :red-card 0} :red)
+             =>
+             {:home {:team
+                     {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
+              :away {:team
+                     {:name "Barcelona"
+                      :players {:goalkeeper [{:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}]
+                                :defense []
+                                :midfield []
+                                :attack []}
+                      :kicked-players '({:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :yellow-cards 2 :red-card 1})} :goals 0}
+              :possession :home
+              :zone :attack
+              :phase :attack
+              :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}
+              :log {:home [] :away [:yellow-card :red-card]}})
+
+       (fact "If player didn't have any yellow cards, and got yellow card, only :yellow-cards is updated.
+       :ball-holder map isn't updated - doesn't affect simulation."
+             (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :yellow-cards 0 :red-card 0) :away {:id 22 :name "Neymar" :yellow-cards 0 :red-card 0} :yellow)
+             =>
+             {:home {:team
+                     {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
+              :away {:team
+                     {:name "Barcelona"
+                      :players {:goalkeeper [{:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}]
+                                :attack [{:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :yellow-cards 1 :red-card 0}]}} :goals 0}
+              :possession :home
+              :zone :attack
+              :phase :attack
+              :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}
+              :log {:home [] :away [:yellow-card]}})
+
+       (fact "If player had one yellow card, and got another one, :yellow-cards and :red-card are updated and function
+       calls events/kick player to kick player. :ball-holder map isn't updated - doesn't affect simulation."
+             (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :yellow-cards 1 :red-card 0) :away {:id 22 :name "Neymar" :yellow-cards 1 :red-card 0} :yellow)
+             =>
+             {:home {:team
+                     {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
+              :away {:team
+                     {:name "Barcelona"
+                      :players {:goalkeeper [{:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}]
+                                :defense []
+                                :midfield []
+                                :attack []}
+                      :kicked-players '({:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :yellow-cards 2 :red-card 1})} :goals 0}
+              :possession :home
+              :zone :attack
+              :phase :attack
+              :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}
+              :log {:home [] :away [:yellow-card :red-card]}}))
+
+(def mock-match-duel
+  {:home {:team
+          {:name "Real madrid"
+           :players {:attack [{:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+          :goals 0}
+   :away {:team
+          {:name "Barcelona"
+           :players {:goalkeeper [{:id 12 :name "Victor Valdes" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]
+                     :defense [{:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+          :goals 0}
+   :possession :home
+   :zone :attack
+   :phase :attack
+   :ball-holder {:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+   :log {:home [] :away []}})
+
+(facts "Testing events/update-duel function"
+       (fact "If ball-holder won duel, it's :duels and :duels-won attributes are updated. Opponent's :duels attribute is
+       updated. This function doesn't update state map attributes aren't updated, just player's."
+             (events/update-duel mock-match-duel true {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})
+             =>
+             ;(-> mock-match-duel
+             ;    (update-in [:home :team :players :attack 0 :duels] inc)
+             ;    (update-in [:home :team :players :attack 0 :duels-won] inc)
+             ;    (update-in [:away :team :players :defense 0 :duels] inc)))
+             {:home {:team
+                     {:name "Real madrid"
+                      :players {:attack [{:id 11 :name "Gareth Bale" :duels 1 :duels-won 1 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                     :goals 0}
+              :away {:team
+                     {:name "Barcelona"
+                      :players {:goalkeeper [{:id 12 :name "Victor Valdes" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]
+                                :defense [{:id 13 :name "Dani Alves" :duels 1 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                     :goals 0}
+              :possession :home
+              :zone :attack
+              :phase :attack
+              :ball-holder {:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+              :log {:home [] :away []}})
+       (fact "If ball-holder lost duel, it's :duels attribute is updated. Opponent's :duels and :duels-won attributes are
+       updated. This function doesn't update state map attributes aren't updated, just player's."
+             (events/update-duel mock-match-duel false {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})
+             =>
+             ;(-> mock-match-duel
+             ;    (update-in [:away :team :players :defense 0 :duels] inc)
+             ;    (update-in [:away :team :players :defense 0 :duels-won] inc)
+             ;    (update-in [:home :team :players :attack 0 :duels] inc))))
+             {:home {:team
+                     {:name "Real madrid"
+                      :players {:attack [{:id 11 :name "Gareth Bale" :duels 1 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                     :goals 0}
+              :away {:team
+                     {:name "Barcelona"
+                      :players {:goalkeeper [{:id 12 :name "Victor Valdes" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]
+                                :defense [{:id 13 :name "Dani Alves" :duels 1 :duels-won 1 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                     :goals 0}
+              :possession :home
+              :zone :attack
+              :phase :attack
+              :ball-holder {:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+              :log {:home [] :away []}}))
+
+(facts "Testing events/finish-duel function"
+       (fact "If duel is lost, player's corresponding attributes are updated, and state map's as well. :ball-holder's attributes
+       aren't updated - doesn't affect simulation."
+             (events/finish-duel mock-match-duel false {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0} false)
+             =>
+             ;(-> mock-match-duel
+             ;    (update-in [:log :home] conj :duel-lost)
+             ;    (update-in [:log :away] conj :duel-won)
+             ;    (assoc :possession :away)
+             ;    (assoc :phase :defense)
+             ;    (assoc :zone :defense)
+             ;    (helpers/inc-events :home 11 [:duels])
+             ;    (helpers/inc-events :away 13 [:duels :duels-won])
+             ;    (assoc :ball-holder {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})))
+             {:home {:team
+                     {:name "Real madrid"
+                      :players {:attack [{:id 11 :name "Gareth Bale" :duels 1 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                     :goals 0}
+              :away {:team
+                     {:name "Barcelona"
+                      :players {:goalkeeper [{:id 12 :name "Victor Valdes" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]
+                                :defense [{:id 13 :name "Dani Alves" :duels 1 :duels-won 1 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                     :goals 0}
+              :possession :away
+              :zone :defense
+              :phase :defense
+              :ball-holder {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+              :log {:home [:duel-lost] :away [:duel-won]}})
+
+       (fact "If duel is won, ball holder's corresponding attributes are updated, and state map's as well. Cross didn't happen.
+       :ball-holder's attributes aren't updated - doesn't affect simulation."
+             (events/finish-duel mock-match-duel true {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0} false)
+             =>
+             ;(-> mock-match-duel
+             ;    (update-in [:log :away] conj :duel-lost)
+             ;    (update-in [:log :home] conj :duel-won)
+             ;    (assoc :possession :home)
+             ;    (assoc :phase :attack)
+             ;    (assoc :zone :attack)
+             ;    (helpers/inc-events :home 11 [:duels :duels-won])
+             ;    (helpers/inc-events :away 13 [:duels])
+             ;    (assoc :ball-holder {:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}))))
+             {:home {:team
+                     {:name "Real madrid"
+                      :players {:attack [{:id 11 :name "Gareth Bale" :duels 1 :duels-won 1 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                     :goals 0}
+              :away {:team
+                     {:name "Barcelona"
+                      :players {:goalkeeper [{:id 12 :name "Victor Valdes" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]
+                                :defense [{:id 13 :name "Dani Alves" :duels 1 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                     :goals 0}
+              :possession :home
+              :zone :attack
+              :phase :attack
+              :ball-holder {:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+              :log {:home [:duel-won] :away [:duel-lost]}})
+
+       (fact "If duel is won, ball holder's corresponding attributes are updated, and state map's as well. Cross happened -
+       :phase and :zone are set to next-zone in order. :ball-holder's attributes aren't updated - doesn't affect simulation."
+             (events/finish-duel mock-match-duel true {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0} true)
+             =>
+             {:home {:team
+                     {:name "Real madrid"
+                      :players {:attack [{:id 11 :name "Gareth Bale" :duels 1 :duels-won 1 :fouls 0 :crosses 1 :yellow-cards 0 :red-card 0}]}}
+                     :goals 0}
+              :away {:team
+                     {:name "Barcelona"
+                      :players {:goalkeeper [{:id 12 :name "Victor Valdes" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]
+                                :defense [{:id 13 :name "Dani Alves" :duels 1 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                     :goals 0}
+              :possession :home
+              :zone :penalty-box
+              :phase :penalty-box
+              :ball-holder {:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+              :log {:home [:duel-won] :away [:duel-lost]}}))
+
+(facts "Testing events/duel-won function"
+       (fact "This function just calls events/finish-duel function with true value provided for
+       is-duel-won attribute. Cross didn't happen."
+             (events/duel-won mock-match-duel {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0} false)
+             => (events/finish-duel mock-match-duel true {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0} false))
+
+       (fact "This function just calls events/finish-duel function with true value provided for
+       is-duel-won attribute. Cross happened."
+       (events/duel-won mock-match-duel {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0} true)
+       => (events/finish-duel mock-match-duel true {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0} true)))
+
+(facts "Testing events/duel-lost function"
+       (fact "This function just calls events/finish-duel function with false value provided for
+       is-duel-won attribute. Cross can't happen."
+             (events/duel-lost mock-match-duel {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})
+             => (events/finish-duel mock-match-duel false {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0} false)))
+
+(facts "Testing events/resume-penalty function"
+       (fact "This function decides which event will occur in order to take penalty. Now, event is shot, and player is
+       Gareth Bale, who scores."
+             (with-redefs [helpers/choose-resume-event (fn [a] :shot)
+                           helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0})
+                           helpers/shot-saved? (fn [a b] false)
+                           helpers/goal? (fn [a] true)
+                           rand (fn [] 0.18)
+                           events/get-shot-duration (fn [a] 0.13)]
+               (events/resume-penalty (assoc mock-match-finish-shot :phase :penalty))
+               => (events/shot mock-match-finish-shot)))
+
+       (fact "This function decides which event will occur in order to take penalty. Now, event is shot, and player is
+       Gareth Bale, who now misses."
+             (with-redefs [helpers/choose-resume-event (fn [a] :shot)
+                           helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0})
+                           helpers/shot-saved? (fn [a b] false)
+                           helpers/goal? (fn [a] false)
+                           rand (fn [] 0.18)
+                           events/get-shot-duration (fn [a] 0.13)]
+               (events/resume-penalty (assoc mock-match-finish-shot :phase :penalty))
+               => (events/shot mock-match-finish-shot)))
+
+       (fact "This function decides which event will occur in order to take penalty. Now, event is shot, shooter is
+       Gareth Bale and goalkeeper saves the penalty."
+             (with-redefs [helpers/choose-resume-event (fn [a] :shot)
+                           helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0})
+                           helpers/shot-saved? (fn [a b] true)
+                           helpers/goal? (fn [a] false)
+                           helpers/corner? (fn [a b] true)
+                           rand (fn [] 0.18)
+                           events/get-shot-duration (fn [a] 0.13)]
+               (events/resume-penalty (assoc mock-match-finish-shot :phase :penalty))
+               => (events/shot mock-match-finish-shot)))
+
+       (fact "This function decides which event will occur in order to take penalty. Now, event is pass, shooter is
+       Gareth Bale."
+             (with-redefs [helpers/choose-resume-event (fn [a] :pass)
+                           helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0 :passes 0 :good-passes 0})
+                           helpers/choose-pass-end-zone (fn [a] :attack)
+                           helpers/pass? (fn [a b] true)
+                           helpers/offside? (fn [a] false)
+                           helpers/out? (fn [a] false)
+                           helpers/new-ball-holder-safe (fn [a b c]
+                                                          {:team :home
+                                                           :zone :attack
+                                                           :player {:id 9 :name "Cristiano Ronaldo"}
+                                                          :opposite? false})
+                           rand (fn [] 0.18)
+                           events/get-shot-duration (fn [a] 0.13)]
+               (events/resume-penalty (-> mock-match-finish-shot
+                                          (assoc :phase :penalty)
+                                          (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                          (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})))
+               => (events/pass (-> mock-match-finish-shot
+                                   (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})
+                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0))))))
+
+(facts "Testing events/resume-corner function."
+       (fact "In this function is chosen which player would take which event. After, that player is set to be new ball
+       holder and event occur. Now pass occurs"
+             (with-redefs [helpers/choose-resume-event (fn [a] :pass)
+                           helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0 :passes 0 :good-passes 0})
+                           helpers/choose-pass-end-zone (fn [a] :attack)
+                           helpers/pass? (fn [a b] true)
+                           helpers/offside? (fn [a] false)
+                           helpers/out? (fn [a] false)
+                           helpers/new-ball-holder-safe (fn [a b c]
+                                                          {:team :home
+                                                           :zone :attack
+                                                           :player {:id 9 :name "Cristiano Ronaldo"}
+                                                           :opposite? false})
+                           rand (fn [] 0.18)
+                           events/get-shot-duration (fn [a] 0.13)]
+
+               (events/resume-corner (-> mock-match-finish-shot
+                                          (assoc :phase :corner)
+                                          (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                          (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})))
+               => (events/pass (-> mock-match-finish-shot
+                                   (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})
+                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)))))
+
+       (fact "In this function is chosen which player would take which event. After, that player is set to be new ball
+       holder and event occur. Now shot occurs"
+             (with-redefs [helpers/choose-resume-event (fn [a] :shot)
+                           helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0})
+                           helpers/shot-saved? (fn [a b] false)
+                           helpers/goal? (fn [a] true)
+                           rand (fn [] 0.18)
+                           events/get-shot-duration (fn [a] 0.13)]
+               (events/resume-corner (assoc mock-match-finish-shot :phase :corner))
+               => (events/shot mock-match-finish-shot))))
+
+(facts "Testing events/resume-foul function"
+       (fact "In this function is chosen which player would take which event. After, that player is set to be new ball
+       holder and event occur. Now shot occurs"
+             (with-redefs [helpers/choose-resume-event (fn [a] :shot)
+                           helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0})
+                           helpers/shot-saved? (fn [a b] false)
+                           helpers/goal? (fn [a] true)
+                           rand (fn [] 0.18)
+                           events/get-shot-duration (fn [a] 0.13)]
+               (events/resume-foul (assoc mock-match-finish-shot :phase :foul))
+               => (events/shot mock-match-finish-shot)))
+
+       (fact "In this function is chosen which player would take which event. After, that player is set to be new ball
+       holder and event occur. Now shot occurs"
+             (with-redefs [helpers/choose-resume-event (fn [a] :pass)
+                           helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0 :passes 0 :good-passes 0})
+                           helpers/choose-pass-end-zone (fn [a] :attack)
+                           helpers/pass? (fn [a b] true)
+                           helpers/offside? (fn [a] false)
+                           helpers/out? (fn [a] false)
+                           helpers/new-ball-holder-safe (fn [a b c]
+                                                          {:team :home
+                                                           :zone :attack
+                                                           :player {:id 9 :name "Cristiano Ronaldo"}
+                                                           :opposite? false})
+                           rand (fn [] 0.18)
+                           events/get-shot-duration (fn [a] 0.13)]
+
+               (events/resume-corner (-> mock-match-finish-shot
+                                         (assoc :phase :corner)
+                                         (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                         (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})))
+               => (events/pass (-> mock-match-finish-shot
+                                   (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})
+                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0))))))
+
+;TESTIRATI FOUL, DUEL
+
+(facts "Testing events/resume-game function"
+       (fact "This function just calls events/resume-good-pass function with chosen pass-end-zone from :midfield zone"
+             (with-redefs [helpers/new-ball-holder-resume-game (fn [a b c] {:id 7 :name "Luka Modric"})
+                           helpers/choose-pass-end-zone (fn [a] :midfield)
+                           rand (fn [] 0.18)
+                           events/get-pass-duration (fn [a b] 1.12)]
+               (events/resume-game (-> mock-match-finish-shot
+                                       (assoc :phase :resume)
+                                       (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                       (update-in [:home :team :players] assoc :midfield [{:id 7 :name "Luka Modric"}])))
+               =>
+               {:new-state {:home {:team
+                       {:name "Real madrid"
+                        :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0 :passes 1 :good-passes 1}]
+                                  :midfield [{:id 7 :name "Luka Modric"}]}}
+                       :goals 0}
+                :away {:team
+                       {:name "Barcelona" :players {:goalkeeper [{:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}] :attack [{:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
+                :possession :home
+                :zone :midfield
+                :phase :midfield
+                :ball-holder {:id 7 :name "Luka Modric"}
+                :log {:home [:pass] :away []}}
+                :event-duration 1.3})))
+
+(facts "Testing events/resume-goal-out"
+       (fact "This function sets :phase to :goalkeeper and just calls events/pass function."
+             (with-redefs [helpers/choose-pass-end-zone (fn [a] :attack)
+                           helpers/pass? (fn [a b] true)
+                           helpers/offside? (fn [a] false)
+                           helpers/out? (fn [a] false)
+                           helpers/new-ball-holder-safe (fn [a b c]
+                                                          {:team :away
+                                                           :zone :attack
+                                                           :player {:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0}
+                                                           :opposite? false})
+                           rand (fn [] 0.18)
+                           events/get-pass-duration (fn [a b] 2.13)]
+
+               (events/resume-goal-out (-> mock-match-finish-shot
+                                           (assoc :possession :away)
+                                           (assoc :phase :goal-out)
+                                           (update-in [:away :team :players :goalkeeper 0] assoc :passes 0 :good-passes 0)
+                                           (assoc :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0 :passes 0 :good-pases 0})))
+               => (events/pass (-> mock-match-finish-shot
+                                   (assoc :possession :away)
+                                   (assoc :phase :goalkeeper)
+                                   (assoc :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0 :passes 0 :good-pases 0})
+                                   (update-in [:away :team :players :goalkeeper 0] assoc :passes 0 :good-passes 0))))))
+
+;TESTIRATI resume-offside, resume-out, get-duel-duration, get-cross-duration
+
+(facts "Testing events/get-pass-duration function"
+       (fact "Depending of pass zone-begin and pass zone-end, pass duration is gathered from map events/pass-duration-map"
+             (events/get-pass-duration :attack :midfield) => 1
+             (events/get-pass-duration :goalkeeper :midfield) => 3.5
+             (events/get-pass-duration :midfield :defense) => 1.5
+             (events/get-pass-duration :defense :penalty-box) => 3.5
+             (events/get-pass-duration :attack :goalkeeper) => 5
+             (events/get-pass-duration :defense :defense) => 1
+             (events/get-pass-duration :midfield :goalkeeper) => 3.5))
+
+(facts "Testing events/get-shot-duration function"
+       (fact "Depending of zone shot is taken from, shot duration is gathered from map events/shot-duration-map"
+             (events/get-shot-duration :defense) => 3
+             (events/get-shot-duration :midfield) => 1.8
+             (events/get-shot-duration :attack) => 1
+             (events/get-shot-duration :penalty-box) => 0.5))
+
+;duel
 ;offside
 ;pass
 ;shot

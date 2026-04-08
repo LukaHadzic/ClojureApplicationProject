@@ -36,7 +36,7 @@
                :minute 0
                :time 0
                :possession :home
-               :zone :attack
+               :zone :midfield ;PROMENJENO UMESTO :attack da bude :midfield
                :phase :resume
                :ball-holder {}
                :log {:home [] :away []}}
@@ -346,7 +346,7 @@
     (choose-pl-max-attr players :passing))))
     ;(choose-pl-max-attr players :skill))))
 
-(defn choose-foul-event
+(defn choose-resume-event
   [zone]
   (let [r (rand)
         actions-probs (zone realiz-possib-map)]

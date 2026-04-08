@@ -156,7 +156,7 @@
   (let [team (:possession state)
         new-end-zone (if (= :penalty-box zone-end) :attack zone-end)
         end-player (helpers/new-ball-holder-resume-game state team new-end-zone)
-        pass-duration (+ (rand) (get-pass-duration :attack new-end-zone))]
+        pass-duration (+ (rand) (get-pass-duration :midfield new-end-zone))]
     (helpers/wrap-return (finish-pass state team new-end-zone end-player :pass) pass-duration))) ;PROMENJENO - umesto zone-end stavljeno new-end-zone
 
 (declare get-pass-duration)
@@ -351,7 +351,7 @@
         opp-team (helpers/opposite-team curr-team)
         ball-holder-id (:id (:ball-holder state))
         opp-player-id (:id opp-player)]
-    (if (= is-duel-won 1)
+    (if is-duel-won
       (-> state
           (helpers/inc-events curr-team ball-holder-id [:duels :duels-won])
           (helpers/inc-events opp-team opp-player-id [:duels]))
@@ -398,21 +398,21 @@
 
 (defn finish-duel
   [state is-duel-won opp-player cross-next-zone?]
-  (if (= is-duel-won 1)
+  (if is-duel-won
     (let [current-team (:possession state)
           diff-team (helpers/opposite-team current-team)]
       (if cross-next-zone?
         ;(if (<= (rand-int 3) -1)
         ;(if (> (helpers/closer-value-to-first? (:speed ball-holder) (:speed opp-player)))
         (-> state
-            (update-duel 1 opp-player)
+            (update-duel true opp-player)
             (helpers/inc-events current-team (:id (:ball-holder state)) [:crosses])
             (update-in [:log current-team] conj :duel-won)
             (update-in [:log diff-team] conj :duel-lost)
             (assoc :zone (helpers/next-zone (:zone state)))
             (assoc :phase (helpers/next-zone (:zone state))))
         (-> state
-            (update-duel 1 opp-player)
+            (update-duel true opp-player)
             (update-in [:log current-team] conj :duel-won)
             (update-in [:log diff-team] conj :duel-lost))))
     (let [old-possession (:possession state)
@@ -420,7 +420,7 @@
           ;new-zone (helpers/opposite-zone state)]
           new-zone (helpers/opposite-zone (:zone state))]
       (-> state
-          (update-duel 0 opp-player)
+          (update-duel false opp-player)
           (update-in [:log old-possession] conj :duel-lost)
           (update-in [:log new-possession] conj :duel-won)
           (assoc :zone new-zone)
@@ -430,11 +430,11 @@
 
 (defn duel-won
   [state opp-player cross-next-zone?]
-  (finish-duel state 1 opp-player cross-next-zone?))
+  (finish-duel state true opp-player cross-next-zone?))
 
 (defn duel-lost
   [state opp-player]
-  (finish-duel state 0 opp-player false))
+  (finish-duel state false opp-player false))
 
 (def event-mapper
   {:shot shot
@@ -443,14 +443,14 @@
 (defn resume-penalty
   [state]
   (let [zone (:zone state)
-        event (event-mapper (helpers/choose-foul-event zone))]
+        event (event-mapper (helpers/choose-resume-event zone))]
     (-> state
         (assoc :ball-holder (helpers/choose-pl-for-event state event))
         (event))))
 
 (defn resume-corner
   [state]
-  (let [event (event-mapper (helpers/choose-foul-event :corner))]
+  (let [event (event-mapper (helpers/choose-resume-event :corner))]
     (-> state
         (assoc :ball-holder (helpers/choose-pl-for-event state event))
         (event))))
@@ -458,7 +458,7 @@
 (defn resume-foul
   [state]
   (let [zone (:zone state)
-        event (event-mapper (helpers/choose-foul-event zone))]
+        event (event-mapper (helpers/choose-resume-event zone))]
     (-> state
         (assoc :ball-holder (helpers/choose-pl-for-event state event))
         (event))))
@@ -534,7 +534,7 @@
 
 (defn resume-game
   [state]
-  (resume-good-pass state (helpers/choose-pass-end-zone :attack)))
+  (resume-good-pass state (helpers/choose-pass-end-zone :midfield)))
 
 (defn resume-goal-out
   [state]

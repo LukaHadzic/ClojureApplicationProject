@@ -62,7 +62,7 @@
    :minute 0
    :time 0
    :possession :home
-   :zone :attack
+   :zone :midfield
    :phase :resume
    :ball-holder {:f "f"}
    :log {:home [] :away []}})
@@ -169,7 +169,7 @@
               :minute 0
               :time 0
               :possession :home
-              :zone :attack
+              :zone :midfield
               :phase :resume
               :ball-holder {:f "f"}
               :log {:home [] :away []}}))
@@ -393,6 +393,7 @@
                                           {:id 9 :finishing 91 :passing 95 :shot-power 87}] :anger)
              => (throws Exception)))
 
+;PROMENITI losi igraci se pretpostavljaju, dobri se biraju
 (facts "Testing helpers/choose-pl-for-event function"
        (fact "Used to find best player from team in possession to take event. If provided event is :shot, player with
        highest :finishing attribute value is picked, else player with highest :passing attribute value is picked."
@@ -425,39 +426,39 @@
                  :strength 78, :offsides 0, :handling 10, :technique 92, :id 7, :yellow-cards 0,
                  :goal-keeping 10, :duels 0, :fouls 0, :attack 78, :saves 0}))
 
-(facts "Testing helpers/choose-foul-event function"
+(facts "Testing helpers/choose-resume-event function"
        (fact "Used to find event that will occur in order to resume foul, corner or penalty"
-             (with-redefs [rand (fn [] 0.3)] (helpers/choose-foul-event :goalkeeper) => :pass)
+             (with-redefs [rand (fn [] 0.3)] (helpers/choose-resume-event :goalkeeper) => :pass)
 
-             (with-redefs [rand (fn [] 0.9)] (helpers/choose-foul-event :goalkeeper) => :pass)
+             (with-redefs [rand (fn [] 0.9)] (helpers/choose-resume-event :goalkeeper) => :pass)
 
-             (with-redefs [rand (fn [] 0.3)] (helpers/choose-foul-event :defense) => :pass)
+             (with-redefs [rand (fn [] 0.3)] (helpers/choose-resume-event :defense) => :pass)
 
-             (with-redefs [rand (fn [] 0.9)] (helpers/choose-foul-event :defense) => :pass)
+             (with-redefs [rand (fn [] 0.9)] (helpers/choose-resume-event :defense) => :pass)
 
-             (with-redefs [rand (fn [] 0.2)] (helpers/choose-foul-event :midfield) => :shot)
+             (with-redefs [rand (fn [] 0.2)] (helpers/choose-resume-event :midfield) => :shot)
 
-             (with-redefs [rand (fn [] 0.4)] (helpers/choose-foul-event :midfield) => :pass)
+             (with-redefs [rand (fn [] 0.4)] (helpers/choose-resume-event :midfield) => :pass)
 
-             (with-redefs [rand (fn [] 0.9)] (helpers/choose-foul-event :midfield) => :pass)
+             (with-redefs [rand (fn [] 0.9)] (helpers/choose-resume-event :midfield) => :pass)
 
-             (with-redefs [rand (fn [] 0.2)] (helpers/choose-foul-event :attack) => :pass)
+             (with-redefs [rand (fn [] 0.2)] (helpers/choose-resume-event :attack) => :pass)
 
-             (with-redefs [rand (fn [] 0.3)] (helpers/choose-foul-event :attack) => :shot)
+             (with-redefs [rand (fn [] 0.3)] (helpers/choose-resume-event :attack) => :shot)
 
-             (with-redefs [rand (fn [] 0.9)] (helpers/choose-foul-event :attack) => :shot)
+             (with-redefs [rand (fn [] 0.9)] (helpers/choose-resume-event :attack) => :shot)
 
-             (with-redefs [rand (fn [] 0.01)] (helpers/choose-foul-event :corner) => :shot)
+             (with-redefs [rand (fn [] 0.01)] (helpers/choose-resume-event :corner) => :shot)
 
-             (with-redefs [rand (fn [] 0.1)] (helpers/choose-foul-event :corner) => :pass)
+             (with-redefs [rand (fn [] 0.1)] (helpers/choose-resume-event :corner) => :pass)
 
-             (with-redefs [rand (fn [] 0.97)] (helpers/choose-foul-event :corner) => :pass)
+             (with-redefs [rand (fn [] 0.97)] (helpers/choose-resume-event :corner) => :pass)
 
-             (with-redefs [rand (fn [] 0.001)] (helpers/choose-foul-event :penalty-box) => :pass)
+             (with-redefs [rand (fn [] 0.001)] (helpers/choose-resume-event :penalty-box) => :pass)
 
-             (with-redefs [rand (fn [] 0.1)] (helpers/choose-foul-event :penalty-box) => :shot)
+             (with-redefs [rand (fn [] 0.1)] (helpers/choose-resume-event :penalty-box) => :shot)
 
-             (with-redefs [rand (fn [] 0.99)] (helpers/choose-foul-event :penalty-box) => :shot)))
+             (with-redefs [rand (fn [] 0.99)] (helpers/choose-resume-event :penalty-box) => :shot)))
 
 (facts "Testing helpers/choose-pass-end-zone function"
        (fact "Used to randomly pick zone that pass should end in. First key which value from (zone pass-possibilities) map

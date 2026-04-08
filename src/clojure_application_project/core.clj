@@ -205,7 +205,7 @@
     (if (> i 90)
       s
       (recur (inc i)
-             (events/update-duel s 1 (helpers/rand-opposite-player state))))))
+             (events/update-duel s true (helpers/rand-opposite-player state))))))
              ;(events/update-duel s (rand-int 2) (helpers/rand-opposite-player state))))))
              ;(events/offside s)))))
 
