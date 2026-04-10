@@ -895,6 +895,106 @@ chance for offside to happen."
 
 ;TESTIRATI FOUL, DUEL
 
+(facts "Testing events/foul function"
+       (fact "Attacking player made foul, didn't get any card"
+             (with-redefs [helpers/foul-attack? (fn [a b] true)
+                           helpers/should-get-card? (fn [a b] {:get-card? false :card nil})]
+               (events/foul mock-match-duel {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})
+               =>
+               {:home {:team
+                       {:name "Real madrid"
+                        :players {:attack [{:id 11 :name "Gareth Bale" :duels 1 :duels-won 0 :fouls 1 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                       :goals 0}
+                :away {:team
+                       {:name "Barcelona"
+                        :players {:goalkeeper [{:id 12 :name "Victor Valdes" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]
+                                  :defense [{:id 13 :name "Dani Alves" :duels 1 :duels-won 1 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}]}}
+                       :goals 0}
+                :possession :away
+                :zone :defense
+                :phase :foul
+                :ball-holder {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+                :log {:home [:foul] :away [:fouled]}}))
+
+       (fact "Attacking player made foul, got yellow card"
+             (with-redefs [helpers/foul-attack? (fn [a b] true)
+                           helpers/should-get-card? (fn [a b] {:get-card? true :card :yellow})]
+               (events/foul mock-match-duel {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})
+               =>
+               (-> mock-match-duel
+                   (assoc :phase :foul)
+                   (assoc :possession :away)
+                   (assoc :zone :defense)
+                   (assoc :ball-holder {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})
+                   (update-in [:log :home] conj :yellow-card :foul)
+                   (update-in [:log :away] conj :fouled)
+                   (helpers/inc-events :home 11 [:duels :fouls :yellow-cards])
+                   (helpers/inc-events :away 13 [:duels :duels-won]))))
+
+       (fact "Defending player made foul, got yellow card and penalty happened"
+             (with-redefs [helpers/foul-attack? (fn [a b] false)
+                           helpers/should-get-card? (fn [a b] {:get-card? true :card :yellow})
+                           helpers/penalty? (fn [a] true)]
+               (events/foul (-> mock-match-duel (assoc :zone :penalty-box)) {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})
+               =>
+               (-> mock-match-duel
+                   (assoc :phase :penalty)
+                   (assoc :possession :home)
+                   (assoc :zone :penalty-box)
+                   (update-in [:log :away] conj :yellow-card :foul-penalty)
+                   (update-in [:log :home] conj :fouled-penalty)
+                   (helpers/inc-events :away 13 [:duels :fouls :yellow-cards])
+                   (helpers/inc-events :home 11 [:duels :duels-won]))))
+
+       (fact "Defending player made foul, didn't get any card, penalty didn't occur"
+             (with-redefs [helpers/foul-attack? (fn [a b] false)
+                           helpers/should-get-card? (fn [a b] {:get-card? false :card nil})
+                           helpers/penalty? (fn [a] false)]
+               (events/foul mock-match-duel {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})
+               =>
+               (-> mock-match-duel
+                   (assoc :phase :foul)
+                   (assoc :possession :home)
+                   (assoc :zone :attack)
+                   (update-in [:log :away] conj :foul)
+                   (update-in [:log :home] conj :fouled)
+                   (helpers/inc-events :away 13 [:duels :fouls])
+                   (helpers/inc-events :home 11 [:duels :duels-won])))))
+
+(facts "Testing events/duel function"
+       (fact "If no opponent's player is picked, cross happens."
+             (with-redefs [helpers/rand-player (fn [a b c] nil)
+                           events/get-cross-duration (fn [a] 2.5)]
+               (events/duel mock-match-duel) =>
+               (helpers/wrap-return (-> mock-match-duel
+                                        (assoc :zone :penalty-box)
+                                        (assoc :phase :penalty-box)
+                                        (helpers/inc-events :home 11 [:crosses])
+                                        (update-in [:log :home] conj :cross)) (events/get-cross-duration :a))))
+
+       (fact "If opponent's player is picked, function checks for foul, cross and is duel won. Now, just cross happens."
+             (with-redefs [helpers/rand-player (fn [a b c] {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0
+                                                            :crosses 0 :yellow-cards 0 :red-card 0 :speed 72 :technique 84
+                                                            :strength 88})
+                           events/get-duel-duration (fn [a b] 2.8)
+                           events/get-cross-duration (fn [a] 2)
+                           rand (fn [a] 0.2)
+                           helpers/cross-next-zone? (fn [a b] true)
+                           helpers/foul? (fn [a b] false)
+                           helpers/duel-won? (fn [a b] true)]
+               (events/duel (-> mock-match-duel
+                                (update-in [:home :team :players :attack 0] assoc :strength 94 :technique 88 :speed 82))) =>
+               (helpers/wrap-return (-> mock-match-duel
+                                        (update-in [:home :team :players :attack 0] assoc :strength 94 :technique 88 :speed 82)
+                                        (assoc :zone :penalty-box)
+                                        (assoc :phase :penalty-box)
+                                        (helpers/inc-events :home 11 [:duels :duels-won :crosses])
+                                        (helpers/inc-events :away 13 [:duels])
+                                        (update-in [:log :home] conj :duel-won :cross)
+                                        (update-in [:log :away] conj :duel-lost)) (+ (events/get-duel-duration :a :b)
+                                                                                     (events/get-cross-duration :a)
+                                                                                     (rand :a))))))
+
 (facts "Testing events/resume-game function"
        (fact "This function just calls events/resume-good-pass function with chosen pass-end-zone from :midfield zone"
              (with-redefs [helpers/new-ball-holder-resume-game (fn [a b c] {:id 7 :name "Luka Modric"})
@@ -945,7 +1045,78 @@ chance for offside to happen."
                                    (assoc :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0 :passes 0 :good-pases 0})
                                    (update-in [:away :team :players :goalkeeper 0] assoc :passes 0 :good-passes 0))))))
 
-;TESTIRATI resume-offside, resume-out, get-duel-duration, get-cross-duration
+(facts "Testing events/resume-offside"
+       (fact "This function just calls pass function, with pass-begin zone set to :defense."
+             (with-redefs [helpers/choose-pass-end-zone (fn [a] :midfield)
+                           helpers/pass? (fn [a b] true)
+                           helpers/offside? (fn [a] false)
+                           helpers/out? (fn [a] false)
+                           helpers/new-ball-holder-safe (fn [a b c]
+                                                          {:team :home
+                                                           :zone :midfield
+                                                           :player {:id 7 :name "Luka Modric"}
+                                                           :opposite? false})
+                           rand (fn [] 0.18)
+                           events/get-pass-duration (fn [a b] 1.12)]
+
+               (events/resume-offside (-> mock-match-finish-shot
+                                          (update-in [:home :team :players] conj [:defense {:id 3 :name "Pepe" :passes 0 :good-passes 0}])
+                                          (update-in [:home :team :players] conj [:midfield {:id 7 :name "Luka Modric"}])
+                                          (assoc :zone :defense)
+                                          (assoc :phase :offside)
+                                          (assoc :ball-holder {:id 3 :name "Pepe" :passes 0 :good-passes 0})))
+               => (events/pass (-> mock-match-finish-shot
+                                   (update-in [:home :team :players] conj [:defense {:id 3 :name "Pepe" :passes 0 :good-passes 0}])
+                                   (update-in [:home :team :players] conj [:midfield {:id 7 :name "Luka Modric"}])
+                                   (assoc :possession :home)
+                                   (assoc :phase :midfield)
+                                   (assoc :ball-holder {:id 7 :name "Luka Modric"}))))))
+
+(facts "Testing events/resume-out function"
+       (fact "This function just calls events/pass-no-offside funtion with :phase set to :out."
+             (with-redefs [helpers/choose-pass-end-zone (fn [a] :midfield)
+                           helpers/pass? (fn [a b] true)
+                           helpers/out? (fn [a] false)
+                           helpers/new-ball-holder-safe (fn [a b c]
+                                                          {:team :home
+                                                           :zone :midfield
+                                                           :player {:id 7 :name "Luka Modric"}
+                                                           :opposite? false})
+                           rand (fn [] 0.18)
+                           events/get-pass-duration (fn [a b] 1.12)]
+
+               (events/resume-out (-> mock-match-finish-shot
+                                          ;(update-in [:home :team :players] conj [:defense {:id 3 :name "Pepe" :passes 0 :good-passes 0}])
+                                          (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                          (update-in [:home :team :players] conj [:midfield {:id 7 :name "Luka Modric"}])
+                                          (assoc :zone :defense)
+                                          (assoc :phase :out)))
+                                          ;(assoc :ball-holder {:id 3 :name "Pepe" :passes 0 :good-passes 0})))
+               => (events/pass-no-offside (-> mock-match-finish-shot
+                                   ;(update-in [:home :team :players] conj [:defense {:id 3 :name "Pepe" :passes 0 :good-passes 0}])
+                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                   (update-in [:home :team :players] conj [:midfield {:id 7 :name "Luka Modric"}])
+                                   ;(assoc :possession :home)
+                                   (assoc :phase :out))))))
+
+(facts "Testing events/get-duel-duration function"
+       (fact "Based on player's :strength and :speed attributes, duel duration is calculated with this math
+       function: (* 3 (Math/pow 0.96656 diff)) where diff is gathered from this math function:
+       (Math/sqrt (+ (* str-diff str-diff) (* sp-diff sp-diff))), str-diff is strength difference and sp-diff is
+       speed difference of two player's attributes from duel."
+             (events/get-duel-duration
+               {:id 11 :name "Gareth Bale" :strength 94 :speed 82}
+               {:id 13 :name "Dani Alves" :strength 88 :speed 72}) =>
+             (* 3 (Math/pow 0.96656 (Math/sqrt (+ (* (- 94 88) (- 94 88)) (* (- 82 72) (- 82 72))))))))
+
+(facts "Testing events/get-cross-duration function"
+       (fact "Bigger the player's :speed attribute is, shorter the time cross takes. Cross is calculated by this function:
+       (+ (* speed-factor base) (rand)), where speed-factor is calculated with (- 1 (/ speed 200)) and base is just scale
+       coefficient set to 3."
+             (with-redefs [rand (fn [] 0.25)]
+               (events/get-cross-duration
+                 {:id 11 :name "Gareth Bale" :speed 82}) =>
+               (+ (* (- 1.0 (/ 82 200)) 3) 0.25))))
 
 (facts "Testing events/get-pass-duration function"
        (fact "Depending of pass zone-begin and pass zone-end, pass duration is gathered from map events/pass-duration-map"
@@ -963,6 +1134,33 @@ chance for offside to happen."
              (events/get-shot-duration :midfield) => 1.8
              (events/get-shot-duration :attack) => 1
              (events/get-shot-duration :penalty-box) => 0.5))
+
+(facts "Testing events/exp-rand function"
+       (fact "Based on provided zone, this function calculates time that is used after for Poisson's distribution of
+       events in simulation. Value for function is gathered from events/zone-lambda-map. With this function,
+       time is calculated and returned: (/ (- (Math/log (- 1 (rand)))) zone-lambda), where zone-lambda is gathered value
+       based on provided zone."
+             (with-redefs [rand (fn [] 0.4)]
+              (events/exp-rand :attack) => (/ (- (Math/log (- 1 (rand)))) (:attack events/zone-lambda-map)))))
+
+(facts "Testing events/choose-event function"
+       (fact "Based on provided :phase and events/phase-actions-controller map (event->probability map for all phases),
+       this function chooses which event will occur in which phase."
+             (with-redefs [rand (fn [] 0.4)]
+               (= (events/choose-event :attack) (:duel events/event-mapper-2)) => true)
+
+             (with-redefs [rand (fn [] 0.8)]
+               (= (events/choose-event :attack) (:shot events/event-mapper-2)) => true)
+
+             (with-redefs [rand (fn [] 0.1)]
+               (= (events/choose-event :attack) (:pass events/event-mapper-2)) => true)
+
+             (with-redefs [rand (fn [] 0.4)]
+               (= (events/choose-event :offside) (:resume-offside events/event-mapper-2)) => true)
+
+             (with-redefs [rand (fn [] 0.99)]
+               (= (events/choose-event :offside) (:resume-offside events/event-mapper-2)) => true)))
+
 
 ;duel
 ;offside

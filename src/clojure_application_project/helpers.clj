@@ -478,6 +478,18 @@
      (calc-avg (:strength ball-holder) (:speed ball-holder))
      (calc-avg (:strength opp-player) (:speed opp-player))))
 
+(defn cross-next-zone?
+  [ball-holder opp-player]
+  (let [cross-quality  (+ (* 0.5 (:speed ball-holder))
+                         (* 0.3 (:technique ball-holder))
+                         (* 0.2 (:strength ball-holder)))
+        defense-quality  (+ (* 0.5 (:speed opp-player))
+                         (* 0.3 (:technique opp-player))
+                         (* 0.2 (:strength opp-player)))
+        corner-prob  (get-goal-prob (- cross-quality defense-quality))
+        r (rand)]
+    (< r corner-prob)))
+
 (defn foul-attack?
   "Is attacking player made foul or it was defending player?"
   [ball-holder opp-player]

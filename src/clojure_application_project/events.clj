@@ -407,7 +407,7 @@
         (-> state
             (update-duel true opp-player)
             (helpers/inc-events current-team (:id (:ball-holder state)) [:crosses])
-            (update-in [:log current-team] conj :duel-won)
+            (update-in [:log current-team] conj :duel-won :cross) ;PROMENJENO da se upise i :cross
             (update-in [:log diff-team] conj :duel-lost)
             (assoc :zone (helpers/next-zone (:zone state)))
             (assoc :phase (helpers/next-zone (:zone state))))
@@ -515,12 +515,15 @@
     ;(if (helpers/foul? ball-holder opp-player)
     (if opp-player
       (let [duel-duration (+ (rand 0.5) (get-duel-duration ball-holder opp-player))
-            cross-next-zone? (> (rand) 0.5)] ;PROMENITI staviti neku logiku da li
-            ; se prelazi u sledecu zonu
-        (if (< (rand) 0.5) ;PROMENITI - Provera da li je foul
+            cross-next-zone? (helpers/cross-next-zone? ball-holder opp-player)]
+        (if (helpers/foul? ball-holder opp-player)
           (helpers/wrap-return (foul state opp-player) duel-duration)
           (if (helpers/duel-won? ball-holder opp-player)
-            (helpers/wrap-return (duel-won state opp-player cross-next-zone?) duel-duration)
+            (let [cross-duration (get-cross-duration ball-holder)
+                  total-duel-duration (if cross-next-zone?
+                                        (+ duel-duration cross-duration)
+                                        duel-duration)]
+              (helpers/wrap-return (duel-won state opp-player cross-next-zone?) total-duel-duration))
             (helpers/wrap-return (duel-lost state opp-player) duel-duration))))
       (let [duel-duration (get-cross-duration ball-holder)
             next-zone (helpers/next-zone (:zone state))]
