@@ -393,16 +393,15 @@
                                           {:id 9 :finishing 91 :passing 95 :shot-power 87}] :anger)
              => (throws Exception)))
 
-;PROMENITI losi igraci se pretpostavljaju, dobri se biraju
 (facts "Testing helpers/choose-pl-for-event function"
        (fact "Used to find best player from team in possession to take event. If provided event is :shot, player with
        highest :finishing attribute value is picked, else player with highest :passing attribute value is picked."
              (helpers/choose-pl-for-event mock-match-test-players :shot)
-             => {:finishing 82, :good-passes 0, :skill 87, :goals 0, :positioning 88, :speed 85,
-                 :duels-won 0, :shot-power 68, :name "Sergio Busquets", :red-card 0,
-                 :crosses 0, :shots-on-goal 0, :passes 0, :shots 0, :passing 88, :reflexes 10,
-                 :defense 85, :strength 60, :offsides 0, :handling 10, :technique 86, :id 17,
-                 :yellow-cards 0, :goal-keeping 10, :duels 0, :fouls 0, :attack 72, :saves 0}
+             => {:finishing 88, :good-passes 0, :skill 87, :goals 0, :positioning 85, :speed 85,
+              :duels-won 0, :shot-power 68, :name "Gerard Pique", :red-card 0, :crosses 0,
+              :shots-on-goal 0, :passes 0, :shots 0, :passing 75, :reflexes 10, :defense 88,
+              :strength 65, :offsides 0, :handling 10, :technique 72, :id 14, :yellow-cards 0,
+              :goal-keeping 10, :duels 0, :fouls 0, :attack 70, :saves 0}
 
              (helpers/choose-pl-for-event mock-match-test-players :pass)
              =>
@@ -413,11 +412,11 @@
               :goal-keeping 10, :duels 0, :fouls 0, :attack 78, :saves 0}
 
              (helpers/choose-pl-for-event (assoc mock-match-test-players :possession :away) :shot)
-             => {:finishing 86, :good-passes 0, :skill 86, :goals 0, :positioning 80, :speed 82,
-                 :duels-won 0, :shot-power 70, :name "Sami Khedira", :red-card 0, :crosses 0,
-                 :shots-on-goal 0, :passes 0, :shots 0, :passing 78, :reflexes 10, :defense 84,
-                 :strength 72, :offsides 0, :handling 10, :technique 74, :id 6, :yellow-cards 0,
-                 :goal-keeping 10, :duels 0, :fouls 0, :attack 75, :saves 0}
+             => {:finishing 90, :good-passes 0, :skill 83, :goals 0, :positioning 82, :speed 80,
+                 :duels-won 0, :shot-power 55, :name "Pepe", :red-card 0, :crosses 0,
+                 :shots-on-goal 0, :passes 0, :shots 0, :passing 65, :reflexes 10, :defense 86,
+                 :strength 72, :offsides 0, :handling 10, :technique 60, :id 3, :yellow-cards 0,
+                 :goal-keeping 10, :duels 0, :fouls 0, :attack 55, :saves 0}
 
              (helpers/choose-pl-for-event (assoc mock-match-test-players :possession :away) :pass)
              => {:finishing 65, :good-passes 0, :skill 88, :goals 0, :positioning 88, :speed 70,
@@ -690,3 +689,19 @@
                (helpers/should-get-card? ;-8.6 -> {:red 0.02 :yellow 0.1}
                  {:id 22 :name "Neymar" :strength 90 :speed 65 :technique 94} ;-> 23.65
                  {:id 4 :name "Ramos" :strength 78 :speed 85 :technique 70}) => {:get-card? true :card :yellow}))) ;->  15.05
+
+(facts "Testing helpers/cross-next-zone? function"
+       (fact "With helpers/get-goal-prob function are gathered probabilities for cross to happen,
+       based on differences of :strength :speed and :technique attributes. Randomly, it's decided if cross happens."
+        (with-redefs [rand (fn [] 0.2)]
+                       (helpers/cross-next-zone? ; -0.4 -> 0.3
+                         {:id 22 :name "Neymar" :strength 90 :speed 65 :technique 94}
+                         {:id 4 :name "Ramos" :strength 78 :speed 85 :technique 70}) => true)
+        (with-redefs [rand (fn [] 0.35)]
+          (helpers/cross-next-zone? ; -0.4 -> 0.3
+            {:id 22 :name "Neymar" :strength 90 :speed 65 :technique 94} ;78.7
+            {:id 4 :name "Ramos" :strength 78 :speed 85 :technique 70}) => false) ;79.1
+        (with-redefs [rand (fn [] 0.7)]
+          (helpers/cross-next-zone? ; -0.4 -> 0.3
+            {:id 22 :name "Neymar" :strength 90 :speed 65 :technique 94}
+            {:id 4 :name "Ramos" :strength 78 :speed 85 :technique 70}) => false)))

@@ -30,7 +30,7 @@
           (-> state
             (update-shot 0)
             (update-in [:log team] conj :miss)
-            (update-in [:log new-possession] conj :ball-won)
+            (update-in [:log new-possession] conj :shot-ball-won)
             (assoc :zone :goalkeeper)
             (assoc :phase :goal-out)
             (assoc :ball-holder updated-ball-holder)

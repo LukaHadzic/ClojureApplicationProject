@@ -504,7 +504,6 @@
         ball-holder-stgh (:strength ball-holder)
         opp-player-stgh (:strength opp-player)]
     (if (>= ball-holder-stgh opp-player-stgh)
-      ;(> 2 1) ;PROMENITI
       (and (> r opp-player-stgh) (< r ball-holder-stgh))
       (and (< r opp-player-stgh) (> r ball-holder-stgh)))))
 
