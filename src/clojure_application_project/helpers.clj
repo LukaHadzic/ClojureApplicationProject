@@ -438,7 +438,7 @@
         r (rand)]
     (< r save-prob)))
 
-(defn goal?
+(defn shot-on-goal?
   [shooter]
   (let [shot-quality  (+ (* 0.5 (:finishing shooter))
                          (* 0.3 (:technique shooter))
@@ -454,11 +454,11 @@
     (< r prob)))
 
 (def offside-chances
-  {:goalkeeper 0.2
-   :defense 0.15
-   :midfield 0.1
-   :attack 0.2
-   :penalty-box 0.3})
+  {:goalkeeper 0.04
+   :defense 0.03
+   :midfield 0.02
+   :attack 0.04
+   :penalty-box 0.06})
 
 (defn offside?
   [zone-from]
@@ -537,17 +537,37 @@
 
 (defn inc-events
   [state team player-id events]
-  (update-in state [team :team :players]
-             (fn [player-pos-map]
-               (update-vals player-pos-map
-                            (fn [players]
-                              (map (fn [p]
-                                     (if (= (:id p) player-id)
-                                       (reduce (fn [updated-p event]
-                                                 (update updated-p event inc))
-                                               p events)
-                                       p))
-                                   players))))))
+  (if (= player-id (:id (:ball-holder state)))
+    (-> state
+        (update-in [:ball-holder]
+                (fn [bh]
+                  (reduce (fn [updated-bh event]
+                            (update updated-bh event inc))
+                          bh
+                          events)))
+        (update-in [team :team :players]
+                   (fn [player-pos-map]
+                     (update-vals player-pos-map
+                                  (fn [players]
+                                    (map (fn [p]
+                                           (if (= (:id p) player-id)
+                                             (reduce (fn [updated-p event]
+                                                       (update updated-p event inc))
+                                                     p events)
+                                             p))
+                                         players))))))
+
+    (update-in state [team :team :players]
+               (fn [player-pos-map]
+                 (update-vals player-pos-map
+                              (fn [players]
+                                (map (fn [p]
+                                       (if (= (:id p) player-id)
+                                         (reduce (fn [updated-p event]
+                                                   (update updated-p event inc))
+                                                 p events)
+                                         p))
+                                     players)))))))
 
 (defn get-card-prob
   [delta]
@@ -581,9 +601,16 @@
         {:get-card? false :card nil}))))
 
 (defn count-event
-  [team event]
-  (reduce + (map event (apply concat (vals (get-in team [:team :players]))))))
-
+  [state team event]
+  (let [players (->> (get-in state [team :team :players])
+                     vals
+                     (remove nil?)
+                     (apply concat))
+        kicked (get-in state [team :team :kicked-players])
+        all (if (nil? (first kicked))
+              players
+              (concat players [kicked]))]
+    (reduce + (map event all))))
 ;(helpers/count-duels {:team {:name "Barcelona",
 ;                             :players {:goalkeeper [{:good-passes 0,
 ;                                                     :skill 87,

@@ -18,13 +18,13 @@
              {:home {:team {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 1 :shots 1 :shots-on-goal 1}]}} :goals 0}
               :away {:team {:name "Barcelona" :players {:goalkeeper [{:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
               :possession :home
-              :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}}
+              :ball-holder {:id 11 :name "Gareth Bale" :goals 1 :shots 1 :shots-on-goal 1}}
 
              (events/update-shot mock-match-update-shot-test 0) =>
              {:home {:team {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 1 :shots-on-goal 0}]}} :goals 0}
               :away {:team {:name "Barcelona" :players {:goalkeeper [{:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
               :possession :home
-              :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}}))
+              :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 1 :shots-on-goal 0}}))
 
 (def mock-match-finish-shot
   {:home {:team
@@ -60,7 +60,7 @@
               :zone :goalkeeper
               :phase :goal-out
               :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}
-              :log {:home [:miss] :away [:ball-won]}}))
+              :log {:home [:miss] :away [:shot-ball-won]}}))
 
 (facts "testing events/goal function"
        (fact "This function only calls finish-shot function with :goal provided."
@@ -86,7 +86,7 @@
                  :zone :goalkeeper
                  :phase :goal-out
                  :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}
-                 :log {:home [:miss] :away [:ball-won]}}))
+                 :log {:home [:miss] :away [:shot-ball-won]}}))
 
 (facts "testing events/shot-saved function"
        (fact "If corner happened, relevant match map attributes are updated. :possession opposite-team; :zone :attack; :phase :corner;
@@ -100,7 +100,7 @@
                    :possession :home
                    :zone :attack
                    :phase :corner
-                   :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}
+                   :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 1 :shots-on-goal 1}
                    :log {:home [:corner] :away [:shot-saved-corner]}}))
 
        (fact "If corner didn't happened, goalkeeper saved the shot and ball is still on the pitch. Relevant match map
@@ -116,7 +116,7 @@
                    :possession :away
                    :zone :goalkeeper
                    :phase :goalkeeper
-                   :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0}
+                   :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 1}
                    :log {:home [:miss] :away [:shot-saved]}}))
 
 
@@ -144,26 +144,26 @@
                    :log {:home [:miss] :away [:shot-saved]}})))
 
 (facts "Testing events/shot function"
-       (fact "If shot is not saved, function checks if goal happened or shot is missed. First, goal happened and function
+       (fact "If shot is on target, function checks if it's saved or goal happened. First, goal happened and function
        calls events/goal function."
-             (with-redefs [helpers/shot-saved? (fn [a b] false)
-                           helpers/goal? (fn [a] true)
+             (with-redefs [helpers/shot-on-goal? (fn [a] true)
+                           helpers/shot-saved? (fn [a b] false)
                            events/get-shot-duration (fn [a] 0.5)
                            rand (fn [] 0.2)]
                (events/shot mock-match-finish-shot)
                => (helpers/wrap-return (events/goal mock-match-finish-shot) (+ (rand) (events/get-shot-duration 0.5)))))
 
-       (fact "If shot is not saved, function checks if goal happened or shot is missed. Now, shot is missed, and function
+       (fact "If shot is on target, function checks if it's saved or goal happened. Now, shot is missed, and function
        calls events/miss function."
-             (with-redefs [helpers/shot-saved? (fn [a b] false)
-                           helpers/goal? (fn [a] false)
+             (with-redefs [helpers/shot-on-goal? (fn [a] false)
                            events/get-shot-duration (fn [a] 0.5)
                            rand (fn [] 0.2)]
                (events/shot mock-match-finish-shot)
                => (helpers/wrap-return (events/miss mock-match-finish-shot) (+ (rand) (events/get-shot-duration 0.5)))))
 
        (fact "If shot is saved, function calls events/shot-saved function."
-             (with-redefs [helpers/shot-saved? (fn [a b] true)
+             (with-redefs [helpers/shot-on-goal?(fn [a] true)
+                           helpers/shot-saved? (fn [a b] true)
                            events/get-shot-duration (fn [a] 0.5)
                            rand (fn [] 0.2)
                            helpers/corner? (fn [a b] false)
@@ -174,16 +174,26 @@
 (facts "Testing events/update-pass function"
        (fact "Used to update statistic attributes of player who played pass. If pass is good, :passes and :good and
        :good-passes are updated"
-             (events/update-pass (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) true)
-             => (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 1 :good-passes 1))
+             (events/update-pass (-> mock-match-finish-shot
+                                     (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                     (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) true)
+             => (-> mock-match-finish-shot
+                    (update-in [:home :team :players :attack 0] assoc :passes 1 :good-passes 1)
+                    (update-in [:ball-holder] assoc :passes 1 :good-passes 1)))
 
        (fact "Used to update statistic attributes of player who played pass. If pass is bad, only :passes is updated"
-             (events/update-pass (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) false)
-             => (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 1 :good-passes 0)))
+             (events/update-pass (-> mock-match-finish-shot
+                                     (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                     (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) false)
+             => (-> mock-match-finish-shot
+                    (update-in [:home :team :players :attack 0] assoc :passes 1 :good-passes 0)
+                    (update-in [:ball-holder] assoc :passes 1 :good-passes 0))))
 
 (facts "Testing events/finish-pass function"
        (fact "This function updates all of state data based on if pass is good or not. First, pass is good."
-             (events/finish-pass (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+             (events/finish-pass (-> mock-match-finish-shot
+                                     (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                     (update-in [:ball-holder] assoc :passes 0 :good-passes 0))
                                  :home :attack {:id 10 :name "Karim Benzema"} true)
              => {:home {:team
                         {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :passes 1 :good-passes 1 :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
@@ -196,7 +206,9 @@
                  :log {:home [:pass] :away []}})
 
        (fact "This function updates all of state data based on if pass is good or not. Now, pass is not good."
-             (events/finish-pass (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+             (events/finish-pass (-> mock-match-finish-shot
+                                     (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                     (update-in [:ball-holder] assoc :passes 0 :good-passes 0))
                                  :away :goalkeeper {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0} false)
              => {:home {:team
                         {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :passes 1 :good-passes 0 :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
@@ -214,7 +226,9 @@
                            events/get-pass-duration (fn [a b] 0.80)
                            helpers/new-ball-holder-resume-game (fn [a b c] {:id 9 :name "Cristiano Ronaldo"})]
                (events/resume-good-pass
-                 (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :attack)
+                 (-> mock-match-finish-shot
+                     (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                     (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack)
                => (just {:new-state {:home {:team
                           {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :passes 1 :good-passes 1 :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
                    :away {:team
@@ -232,7 +246,9 @@
                            events/get-pass-duration (fn [a b] 0.80)
                            helpers/new-ball-holder-resume-game (fn [a b c] {:id 9 :name "Cristiano Ronaldo"})]
                (events/resume-good-pass
-                 (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :penalty-box)
+                 (-> mock-match-finish-shot
+                     (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                     (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :penalty-box)
                => (just {:new-state {:home {:team
                                       {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :passes 1 :good-passes 1 :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
                                :away {:team
@@ -253,7 +269,9 @@
                                                            :opposite? false})
                            events/get-pass-duration (fn [a b] 0.7)]
                (events/handle-good-pass
-                 (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :attack)
+                 (-> mock-match-finish-shot
+                     (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                     (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack)
                => {:new-state {:home {:team
                                             {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :passes 1 :good-passes 1 :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
                                      :away {:team
@@ -272,7 +290,9 @@
                                                            :opposite? true})
                            events/get-pass-duration (fn [a b] 1.5)]
                (events/handle-good-pass
-                 (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :attack)
+                 (-> mock-match-finish-shot
+                     (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                     (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack)
                => {:new-state {:home {:team
                                             {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :passes 1 :good-passes 0 :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
                                      :away {:team
@@ -294,7 +314,9 @@
                                                            :opposite? false})
                            events/get-pass-duration (fn [a b] 1.8)]
                (events/handle-bad-pass
-                 (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :attack)
+                 (-> mock-match-finish-shot
+                     (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                     (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack)
                => {:new-state {:home {:team
                                             {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :passes 1 :good-passes 0 :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
                                      :away {:team
@@ -314,7 +336,9 @@
                                                            :opposite? true})
                            events/get-pass-duration (fn [a b] 0.7)]
                (events/handle-bad-pass
-                 (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :attack)
+                 (-> mock-match-finish-shot
+                     (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                     (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack)
                => {:new-state {:home {:team
                                       {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :passes 1 :good-passes 1 :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
                                :away {:team
@@ -337,6 +361,7 @@
                                                                    {:id 13 :name "Dani Alves"}))]
              (events/offside (-> mock-match-finish-shot
                                  (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                 (update-in [:ball-holder] assoc :passes 0 :good-passes 0)
                                  (update-in [:home :team :players :attack] conj {:id 10 :name "Karim Benzema" :offsides 0}))))
              => {:home {:team
                         {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :passes 1 :good-passes 0 :goals 0 :shots 0 :shots-on-goal 0}
@@ -355,7 +380,9 @@
        to :out. New ball holder should be picked from opposite zone, :passess of previous ball holder is updated.
        :out-ball-lost and :out-ball-won logs are written to corresponding teams"
              (with-redefs [helpers/new-ball-holder-resume-game (fn [a b c] {:id 13 :name "Dani Alves"})]
-               (events/out (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :attack))
+               (events/out (-> mock-match-finish-shot
+                               (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                               (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack))
                => {:home {:team
                          {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :passes 1 :good-passes 0 :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
                   :away {:team
@@ -376,11 +403,14 @@
                                                                    {:id 10 :name "Karim Benzema"}
                                                                    {:id 13 :name "Dani Alves"}))]
                (events/pass (-> mock-match-finish-shot
-                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
-                                   (update-in [:home :team :players :attack] conj {:id 10 :name "Karim Benzema" :offsides 0})))
+                                (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                (update-in [:ball-holder] assoc :passes 0 :good-passes 0)
+                                (update-in [:home :team :players :attack] conj {:id 10 :name "Karim Benzema" :offsides 0})))
                => (helpers/wrap-return (events/offside (-> mock-match-finish-shot
                                         (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
-                                        (update-in [:home :team :players :attack] conj {:id 10 :name "Karim Benzema" :offsides 0}))) 0.5)))
+                                        (update-in [:ball-holder] assoc :passes 0 :good-passes 0)
+                                        (update-in [:home :team :players :attack] conj {:id 10 :name "Karim Benzema" :offsides 0})
+                                        (update-in [:ball-holder] assoc :offsides 0))) 0.5)))
 
        (fact "It's decided that out occured, events/pass function just calls events/out function"
              (with-redefs [helpers/offside? (fn [a] false)
@@ -389,9 +419,11 @@
                            events/get-pass-duration (fn [a b] 0.3)
                            helpers/new-ball-holder-resume-game (fn [a b c] {:id 13 :name "Dani Alves"})]
                (events/pass (-> mock-match-finish-shot
-                                (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)))
+                                (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                (update-in [:ball-holder] assoc :passes 0 :good-passes 0)))
                => (helpers/wrap-return (events/out (-> mock-match-finish-shot
-                                                           (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)) :attack) 0.5)))
+                                                       (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                                       (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack) 0.5)))
 
        (fact "If neither offside or out happened, this function checks if pass should be good. Now, pass should be good
        so events/pass calls events/handle-good-pass function."
@@ -406,9 +438,11 @@
                                                            :player {:id 10 :name "Karim Benzema"}
                                                            :opposite? false})]
                (events/pass (-> mock-match-finish-shot
-                                (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)))
+                                (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                (update-in [:ball-holder] assoc :passes 0 :good-passes 0)))
                => (events/handle-good-pass (-> mock-match-finish-shot
-                                                       (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)) :attack)))
+                                               (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                               (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack)))
 
        (fact "If neither offside or out happened, this function checks if pass should be good. Now, pass should be bad so
        events/pass calls events/handle-bad-pass function."
@@ -423,9 +457,11 @@
                                                            :player {:id 13 :name "Dani Alves"}
                                                            :opposite? false})]
                (events/pass (-> mock-match-finish-shot
-                                (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)))
+                                (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                (update-in [:ball-holder] assoc :passes 0 :good-passes 0)))
                => (events/handle-bad-pass (-> mock-match-finish-shot
-                                               (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)) :attack))))
+                                              (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                              (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack))))
 
 (facts "Testing events/pass-no-offside function. It should behave the same as the events/pass function, just without
 chance for offside to happen."
@@ -441,8 +477,12 @@ chance for offside to happen."
                                                            :zone :attack
                                                            :player {:id 9 :name "Cristiano Ronaldo"}
                                                            :opposite? false})]
-               (events/pass-no-offside (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0))
-               => (events/handle-good-pass (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :attack)))
+               (events/pass-no-offside (-> mock-match-finish-shot
+                                           (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                           (update-in [:ball-holder] assoc :passes 0 :good-passes 0)))
+               => (events/handle-good-pass (-> mock-match-finish-shot
+                                               (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                               (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack)))
 
        (fact "It's decided that out didn't occur and that pass should be bad, events/pass-no-offside function just
        calls events/handle-bad-pass function"
@@ -456,8 +496,12 @@ chance for offside to happen."
                                                            :zone :defense
                                                            :player {:id 13 :name "Dani Alves"}
                                                            :opposite? false})]
-               (events/pass-no-offside (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0))
-               => (events/handle-bad-pass (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :attack)))
+               (events/pass-no-offside (-> mock-match-finish-shot
+                                           (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                           (update-in [:ball-holder] assoc :passes 0 :good-passes 0)))
+               => (events/handle-bad-pass (-> mock-match-finish-shot
+                                              (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                              (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack)))
 
        (fact "It's decided that out occurred when resuming out, events/pass-no-offside function just
        calls events/out function"
@@ -474,8 +518,11 @@ chance for offside to happen."
                            ;                                :opposite? false})]
                (events/pass-no-offside (-> mock-match-finish-shot
                                            (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                           (update-in [:ball-holder] assoc :passes 0 :good-passes 0)
                                            (assoc :phase :out)))
-               => (helpers/wrap-return (events/out (update-in mock-match-finish-shot [:home :team :players :attack 0] assoc :passes 0 :good-passes 0) :attack) 0.4))))
+               => (helpers/wrap-return (events/out (-> mock-match-finish-shot
+                                                       (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                                       (update-in [:ball-holder] assoc :passes 0 :good-passes 0)) :attack) 0.4))))
 
 (facts "Testing events/set-new-goalkeeper function"
        (fact "After helper function chooses player with maximum :goal-keeping attribute, that player is set to be new
@@ -538,7 +585,7 @@ chance for offside to happen."
 (facts "Testing events/get-card function"
        (fact "Player got red card. If player didn't have any yellow cards, only :red-card is updated and function calls
        events/kick-player function to kick player.If player had one yellow card, :yellow-cards :red-card are updated, and
-       function calls events/kick-player function to kick player. :ball-holder map isn't updated - doesn't affect simulation."
+       function calls events/kick-player function to kick player."
              (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :yellow-cards 0 :red-card 0) :away {:id 22 :name "Neymar" :yellow-cards 0 :red-card 0} :red)
              =>
              {:home {:team
@@ -573,8 +620,7 @@ chance for offside to happen."
               :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}
               :log {:home [] :away [:yellow-card :red-card]}})
 
-       (fact "If player didn't have any yellow cards, and got yellow card, only :yellow-cards is updated.
-       :ball-holder map isn't updated - doesn't affect simulation."
+       (fact "If player didn't have any yellow cards, and got yellow card, only :yellow-cards is updated."
              (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :yellow-cards 0 :red-card 0) :away {:id 22 :name "Neymar" :yellow-cards 0 :red-card 0} :yellow)
              =>
              {:home {:team
@@ -626,7 +672,7 @@ chance for offside to happen."
 
 (facts "Testing events/update-duel function"
        (fact "If ball-holder won duel, it's :duels and :duels-won attributes are updated. Opponent's :duels attribute is
-       updated. This function doesn't update state map attributes aren't updated, just player's."
+       updated. This function doesn't update state map attributes, just player's."
              (events/update-duel mock-match-duel true {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})
              =>
              ;(-> mock-match-duel
@@ -645,10 +691,10 @@ chance for offside to happen."
               :possession :home
               :zone :attack
               :phase :attack
-              :ball-holder {:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+              :ball-holder {:id 11 :name "Gareth Bale" :duels 1 :duels-won 1 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
               :log {:home [] :away []}})
        (fact "If ball-holder lost duel, it's :duels attribute is updated. Opponent's :duels and :duels-won attributes are
-       updated. This function doesn't update state map attributes aren't updated, just player's."
+       updated. This function doesn't update state map attributes, just player's."
              (events/update-duel mock-match-duel false {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0})
              =>
              ;(-> mock-match-duel
@@ -667,12 +713,11 @@ chance for offside to happen."
               :possession :home
               :zone :attack
               :phase :attack
-              :ball-holder {:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+              :ball-holder {:id 11 :name "Gareth Bale" :duels 1 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
               :log {:home [] :away []}}))
 
 (facts "Testing events/finish-duel function"
-       (fact "If duel is lost, player's corresponding attributes are updated, and state map's as well. :ball-holder's attributes
-       aren't updated - doesn't affect simulation."
+       (fact "If duel is lost, player's corresponding attributes are updated, and state map's as well."
              (events/finish-duel mock-match-duel false {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0} false)
              =>
              ;(-> mock-match-duel
@@ -696,11 +741,10 @@ chance for offside to happen."
               :possession :away
               :zone :defense
               :phase :defense
-              :ball-holder {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+              :ball-holder {:id 13 :name "Dani Alves" :duels 1 :duels-won 1 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
               :log {:home [:duel-lost] :away [:duel-won]}})
 
-       (fact "If duel is won, ball holder's corresponding attributes are updated, and state map's as well. Cross didn't happen.
-       :ball-holder's attributes aren't updated - doesn't affect simulation."
+       (fact "If duel is won, ball holder's corresponding attributes are updated, and state map's as well. Cross didn't happen."
              (events/finish-duel mock-match-duel true {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0} false)
              =>
              ;(-> mock-match-duel
@@ -724,7 +768,7 @@ chance for offside to happen."
               :possession :home
               :zone :attack
               :phase :attack
-              :ball-holder {:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+              :ball-holder {:id 11 :name "Gareth Bale" :duels 1 :duels-won 1 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
               :log {:home [:duel-won] :away [:duel-lost]}})
 
        (fact "If duel is won, ball holder's corresponding attributes are updated, and state map's as well. Cross happened -
@@ -743,8 +787,8 @@ chance for offside to happen."
               :possession :home
               :zone :penalty-box
               :phase :penalty-box
-              :ball-holder {:id 11 :name "Gareth Bale" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
-              :log {:home [:duel-won] :away [:duel-lost]}}))
+              :ball-holder {:id 11 :name "Gareth Bale" :duels 1 :duels-won 1 :fouls 0 :crosses 1 :yellow-cards 0 :red-card 0}
+              :log {:home [:duel-won :cross] :away [:duel-lost]}}))
 
 (facts "Testing events/duel-won function"
        (fact "This function just calls events/finish-duel function with true value provided for
@@ -769,7 +813,7 @@ chance for offside to happen."
              (with-redefs [helpers/choose-resume-event (fn [a] :shot)
                            helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0})
                            helpers/shot-saved? (fn [a b] false)
-                           helpers/goal? (fn [a] true)
+                           helpers/shot-on-goal? (fn [a] true)
                            rand (fn [] 0.18)
                            events/get-shot-duration (fn [a] 0.13)]
                (events/resume-penalty (assoc mock-match-finish-shot :phase :penalty))
@@ -780,7 +824,7 @@ chance for offside to happen."
              (with-redefs [helpers/choose-resume-event (fn [a] :shot)
                            helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0})
                            helpers/shot-saved? (fn [a b] false)
-                           helpers/goal? (fn [a] false)
+                           helpers/shot-on-goal? (fn [a] false)
                            rand (fn [] 0.18)
                            events/get-shot-duration (fn [a] 0.13)]
                (events/resume-penalty (assoc mock-match-finish-shot :phase :penalty))
@@ -791,7 +835,7 @@ chance for offside to happen."
              (with-redefs [helpers/choose-resume-event (fn [a] :shot)
                            helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0})
                            helpers/shot-saved? (fn [a b] true)
-                           helpers/goal? (fn [a] false)
+                           helpers/shot-on-goal? (fn [a] false)
                            helpers/corner? (fn [a b] true)
                            rand (fn [] 0.18)
                            events/get-shot-duration (fn [a] 0.13)]
@@ -816,10 +860,12 @@ chance for offside to happen."
                (events/resume-penalty (-> mock-match-finish-shot
                                           (assoc :phase :penalty)
                                           (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                          (update-in [:ball-holder] assoc :passes 0 :good-passes 0)
                                           (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})))
                => (events/pass (-> mock-match-finish-shot
                                    (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})
-                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0))))))
+                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                   (update-in [:ball-holder] assoc :passes 0 :good-passes 0))))))
 
 (facts "Testing events/resume-corner function."
        (fact "In this function is chosen which player would take which event. After, that player is set to be new ball
@@ -841,17 +887,19 @@ chance for offside to happen."
                (events/resume-corner (-> mock-match-finish-shot
                                           (assoc :phase :corner)
                                           (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                          (update-in [:ball-holder] assoc :passes 0 :good-passes 0)
                                           (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})))
                => (events/pass (-> mock-match-finish-shot
                                    (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})
-                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)))))
+                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                   (update-in [:ball-holder] assoc :passes 0 :good-passes 0)))))
 
        (fact "In this function is chosen which player would take which event. After, that player is set to be new ball
        holder and event occur. Now shot occurs"
              (with-redefs [helpers/choose-resume-event (fn [a] :shot)
                            helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0})
                            helpers/shot-saved? (fn [a b] false)
-                           helpers/goal? (fn [a] true)
+                           helpers/shot-on-goal? (fn [a] true)
                            rand (fn [] 0.18)
                            events/get-shot-duration (fn [a] 0.13)]
                (events/resume-corner (assoc mock-match-finish-shot :phase :corner))
@@ -863,7 +911,7 @@ chance for offside to happen."
              (with-redefs [helpers/choose-resume-event (fn [a] :shot)
                            helpers/choose-pl-max-attr (fn [a b] {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0})
                            helpers/shot-saved? (fn [a b] false)
-                           helpers/goal? (fn [a] true)
+                           helpers/shot-on-goal? (fn [a] true)
                            rand (fn [] 0.18)
                            events/get-shot-duration (fn [a] 0.13)]
                (events/resume-foul (assoc mock-match-finish-shot :phase :foul))
@@ -888,10 +936,12 @@ chance for offside to happen."
                (events/resume-corner (-> mock-match-finish-shot
                                          (assoc :phase :corner)
                                          (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                         (update-in [:ball-holder] assoc :passes 0 :good-passes 0)
                                          (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})))
                => (events/pass (-> mock-match-finish-shot
                                    (update-in [:home :team :players :attack] conj {:id 9 :name "Cristiano Ronaldo"})
-                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0))))))
+                                   (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                   (update-in [:ball-holder] assoc :passes 0 :good-passes 0))))))
 
 ;TESTIRATI FOUL, DUEL
 
@@ -913,7 +963,7 @@ chance for offside to happen."
                 :possession :away
                 :zone :defense
                 :phase :foul
-                :ball-holder {:id 13 :name "Dani Alves" :duels 0 :duels-won 0 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
+                :ball-holder {:id 13 :name "Dani Alves" :duels 1 :duels-won 1 :fouls 0 :crosses 0 :yellow-cards 0 :red-card 0}
                 :log {:home [:foul] :away [:fouled]}}))
 
        (fact "Attacking player made foul, got yellow card"
@@ -1004,6 +1054,7 @@ chance for offside to happen."
                (events/resume-game (-> mock-match-finish-shot
                                        (assoc :phase :resume)
                                        (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                       (update-in [:ball-holder] assoc :passes 0 :good-passes 0)
                                        (update-in [:home :team :players] assoc :midfield [{:id 7 :name "Luka Modric"}])))
                =>
                {:new-state {:home {:team
@@ -1038,12 +1089,12 @@ chance for offside to happen."
                                            (assoc :possession :away)
                                            (assoc :phase :goal-out)
                                            (update-in [:away :team :players :goalkeeper 0] assoc :passes 0 :good-passes 0)
-                                           (assoc :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0 :passes 0 :good-pases 0})))
+                                           (assoc :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0 :passes 0 :good-passes 0})))
                => (events/pass (-> mock-match-finish-shot
                                    (assoc :possession :away)
                                    (assoc :phase :goalkeeper)
-                                   (assoc :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0 :passes 0 :good-pases 0})
-                                   (update-in [:away :team :players :goalkeeper 0] assoc :passes 0 :good-passes 0))))))
+                                   (update-in [:away :team :players :goalkeeper 0] assoc :passes 0 :good-passes 0)
+                                   (assoc :ball-holder {:id 12 :name "Victor Valdes" :goals 0 :shots 0 :shots-on-goal 0 :saves 0 :passes 0 :good-passes 0}))))))
 
 (facts "Testing events/resume-offside"
        (fact "This function just calls pass function, with pass-begin zone set to :defense."
@@ -1070,7 +1121,7 @@ chance for offside to happen."
                                    (update-in [:home :team :players] conj [:midfield {:id 7 :name "Luka Modric"}])
                                    (assoc :possession :home)
                                    (assoc :phase :midfield)
-                                   (assoc :ball-holder {:id 7 :name "Luka Modric"}))))))
+                                   (assoc :ball-holder {:id 3 :name "Pepe" :passes 0 :good-passes 0}))))))
 
 (facts "Testing events/resume-out function"
        (fact "This function just calls events/pass-no-offside funtion with :phase set to :out."
@@ -1088,6 +1139,7 @@ chance for offside to happen."
                (events/resume-out (-> mock-match-finish-shot
                                           ;(update-in [:home :team :players] conj [:defense {:id 3 :name "Pepe" :passes 0 :good-passes 0}])
                                           (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                          (update-in [:ball-holder] assoc :passes 0 :good-passes 0)
                                           (update-in [:home :team :players] conj [:midfield {:id 7 :name "Luka Modric"}])
                                           (assoc :zone :defense)
                                           (assoc :phase :out)))
@@ -1095,6 +1147,7 @@ chance for offside to happen."
                => (events/pass-no-offside (-> mock-match-finish-shot
                                    ;(update-in [:home :team :players] conj [:defense {:id 3 :name "Pepe" :passes 0 :good-passes 0}])
                                    (update-in [:home :team :players :attack 0] assoc :passes 0 :good-passes 0)
+                                   (update-in [:ball-holder] assoc :passes 0 :good-passes 0)
                                    (update-in [:home :team :players] conj [:midfield {:id 7 :name "Luka Modric"}])
                                    ;(assoc :possession :home)
                                    (assoc :phase :out))))))
@@ -1147,13 +1200,13 @@ chance for offside to happen."
        (fact "Based on provided :phase and events/phase-actions-controller map (event->probability map for all phases),
        this function chooses which event will occur in which phase."
              (with-redefs [rand (fn [] 0.4)]
-               (= (events/choose-event :attack) (:duel events/event-mapper-2)) => true)
+               (= (events/choose-event :attack) (:pass events/event-mapper-2)) => true)
 
              (with-redefs [rand (fn [] 0.8)]
-               (= (events/choose-event :attack) (:shot events/event-mapper-2)) => true)
+               (= (events/choose-event :attack) (:duel events/event-mapper-2)) => true)
 
-             (with-redefs [rand (fn [] 0.1)]
-               (= (events/choose-event :attack) (:pass events/event-mapper-2)) => true)
+             (with-redefs [rand (fn [] 0.95)]
+               (= (events/choose-event :attack) (:shot events/event-mapper-2)) => true)
 
              (with-redefs [rand (fn [] 0.4)]
                (= (events/choose-event :offside) (:resume-offside events/event-mapper-2)) => true)

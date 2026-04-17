@@ -48,28 +48,29 @@
   (let [zone (:zone state)
         duration (events/exp-rand zone)
         event (events/choose-event (:phase state))
-        ;POPRAVITI ;Ako je event out, foul, corner ili penalty, duration se ne uzima u obzir!
         return-map (event state)
         event-duration (:event-duration return-map)
         new-state (:new-state return-map)]
     (if (nil? new-state)
       (println "new state je nil")
       (do
-        (println (str "Ball holder: " (:name (:ball-holder state))))
-        (println (str "Possession: " (:possession state)))
-        (println (str "Time: " (:time state)))
-        (println (str "Zone: " (:zone state)))
-        (println (str "Phase: " (:phase state)))
+        ;(println (str "Ball holder: " (:name (:ball-holder state))))
+        ;(println (str "Possession: " (:possession state)))
+        ;(println (str "Time: " (:time state)))
+        ;(println (str "Zone: " (:zone state)))
+        ;(println (str "Phase: " (:phase state)))
+        ;(println (str "Event that occured: " event))
+        ;(println (str "New Ball holder: " (:name (:ball-holder new-state))))
+        ;(println (str "New Possession: " (:possession new-state)))
+        ;(println (str "New Time: " (+ (:time state) duration event-duration)))
+        ;(println (str "New Zone: " (:zone new-state)))
+        ;(println (str "New Phase: " (:phase new-state)))
         ;(println "")
-        (println (str "Event that occured: " event))
-        ;(println "")
-        (println (str "New Ball holder: " (:name (:ball-holder new-state))))
-        (println (str "New Possession: " (:possession new-state)))
-        (println (str "New Time: " (+ (:time state) duration event-duration)))
-        (println (str "New Zone: " (:zone new-state)))
-        (println (str "New Phase: " (:phase new-state)))
-        (println "")
         ;(if (= (:phase state) :penalty) (println "Penalty occured!"))
+        ;(println (str "Shots: " (helpers/count-event new-state :away :shots)))
+        ;(println (str "Shots on goal: " (helpers/count-event new-state :away :shots-on-goal)))
+        ;(println (str "Saves: " (helpers/count-event new-state :home :saves)))
+        ;(println (str "Goals: " (helpers/count-event new-state :away :goals)))
         (update new-state :time + duration event-duration))))) ;   goal-keeping defense passing attack
                                                                     ;handling reflexes positioning
                                                                     ;technique shot-power finishing
@@ -146,68 +147,114 @@
                                  (helpers/make-player 22 "Neymar"
                                                       87 10 50 84 88 10 10 84 94 86 60 90 65)]})))
 
-;(simulate-minute el-classico)
+(defn max-20-chars
+  [s]
+  (let [s (str s)]
+    (if (> (count s) 20)
+      (subs s 0 20)
+      s)))
 
-;DOBRO
-;(defn simulate-match
-;  [match]
-;  (loop [game-data match]
-;    (if (>= (:minute game-data) 90)
-;      game-data
-;      (let [updated-game-data (simulate-minute game-data)]
-;        (recur (update updated-game-data :minute inc))))))
+(defn padd-with-spaces
+  [team-name-len]
+  (let [n (- (/ team-name-len 2) 2)]
+    (apply str (repeat (max 0 n) " "))))
+
+(defn show-match-end
+  [state]
+  (let [home (get-in state [:home])
+        away (get-in state [:away])
+        home-name-length (count (:name (:team home)))]
+
+    (println "\n==============================")
+    (println "        MATCH FINISHED       ")
+    (println "==============================\n")
+
+    (println (format "%s        :        %-15s"
+                     (max-20-chars (:name (:team home)))
+                     (:name (:team away))))
+
+    (println (format "%s%4d          Goals        %4d"
+                     (padd-with-spaces home-name-length)
+                     (:goals home)
+                     (:goals away)))
+
+    (println (format "%s%4d          Shots        %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :shots)
+                     (helpers/count-event state :away :shots)))
+
+    (println (format "%s%4d     Shots on target   %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :shots-on-goal)
+                     (helpers/count-event state :away :shots-on-goal)))
+
+    (println (format "%s%4d          Passes       %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :passes)
+                     (helpers/count-event state :away :passes)))
+
+    (println (format "%s%4d       Good passes     %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :good-passes)
+                     (helpers/count-event state :away :good-passes)))
+
+    (println (format "%s%4d         Offsides      %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :offsides)
+                     (helpers/count-event state :away :offsides)))
+
+    (println (format "%s%4d          Duels        %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :duels)
+                     (helpers/count-event state :away :duels)))
+
+    (println (format "%s%4d        Duels won      %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :duels-won)
+                     (helpers/count-event state :away :duels-won)))
+
+    (println (format "%s%4d        Driblings      %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :crosses)
+                     (helpers/count-event state :away :crosses)))
+
+    (println (format "%s%4d          Fouls        %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :fouls)
+                     (helpers/count-event state :away :fouls)))
+
+    (println (format "%s%4d       Yellow cards    %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :yellow-cards)
+                     (helpers/count-event state :away :yellow-cards)))
+
+    (println (format "%s%4d        Red cards      %4d"
+                     (padd-with-spaces home-name-length)
+                     (helpers/count-event state :home :red-card)
+                     (helpers/count-event state :away :red-card)))
+
+    (println "    ______________________________\n")))
 
 (defn simulate-match
   [state]
   (loop [curr-state state]
     (let [time (:time curr-state)]
       (if (>= time 5400)
-        curr-state
+        (do
+          (show-match-end curr-state)
+          curr-state)
         (recur (simulate-event curr-state))))))
 
-;(helpers/count-event (:home el-classico-fin) :duels)
+(def el-class-fin
+  (simulate-match el-classico))
 
-;(def el-classico-fin (simulate-match el-classico))
+(do
+  (println (str "Shots: " (helpers/count-event el-class-fin :away :shots)))
+  (println (str "Shots on goal: " (helpers/count-event el-class-fin :away :shots-on-goal)))
+  (println (str "Saves: " (helpers/count-event el-class-fin :home :saves)))
+  (println (str "Goals: " (helpers/count-event el-class-fin :away :goals)))
+  (println (str "Red cards: " (helpers/count-event el-class-fin :away :red-card))))
 
-;(dotimes [cnt 1000]
-;  (simulate-match el-classico));
-
-  ;PROBLEM KOJI SE JAVLJA:
-    ;Ball holder: Luka Modric
-    ;Possession: :home
-    ;Time: 5180.235079054371
-    ;Zone: :penalty-box
-    ;Phase: :penalty-box
-    ;Event that occured: clojure_application_project.events$duel@3cd55645
-    ;New Ball holder: Luka Modric
-    ;New Possession: :home
-    ;New Time: 5188.203894628516
-    ;New Zone: :penalty-box
-    ;New Phase: :penalty
-
-    ;Execution error (NullPointerException) at clojure-application-project.helpers/shot-saved? (helpers.clj:431).
-    ;Cannot invoke "java.lang.Number.doubleValue()" because "y" is null
-
-
-;URADITI ALI PRED KRAJ
-;Napraviti -> out, goal-out, foul, penalty
-;poasonova raspodela
-
-;URADITI
-;Ubaciti golmana - odbrana suta -> ZAVRSENO
-;Ubaciti golmana u igru, pasevi i dueli -> ZAVRSENO
-; samo ostaviti :goalkeeper u svakom timu
-; za duele se biraju protivnicki igraci iz attack
-
-(defn simulate-debug-game [state]
-  (loop [i 1
-         s state]
-    (if (> i 90)
-      s
-      (recur (inc i)
-             (events/update-duel s true (helpers/rand-opposite-player state))))))
-             ;(events/update-duel s (rand-int 2) (helpers/rand-opposite-player state))))))
-             ;(events/offside s)))))
 
 (defn -main
   "I don't do a whole lot ... yet."
@@ -281,27 +328,4 @@
                                                    (helpers/make-player 22 "Neymar"
                                                                         87 10 50 84 88 10 10 84 94 86 60 90 65)]}))]
 
-    (events/resume-foul (assoc (assoc (assoc el-classico :ball-holder {:id 1 :name "Iker" :skill 86
-                                                                            :goal-keeping 96 :defense 96 :passing 96 :strength 96 :finishing 96 :attack 96 :speed 96
-                                                                            :saves 0 :passes 0 :good-passes 0
-                                                                            :shots 0 :shots-on-goal 0 :goals 0 :duels 0 :duels-won 0 :offsides 0 :fouls 0}
-                                                                           ) :zone :goalkeeper) :phase :goalkeeper))
-
-                  ;{:id 21 :name "Pedro" :skill 85
-                 ; :goal-keeping 96 :defense 96 :passing 96 :strength 96 :finishing 96 :attack 96 :speed 96
-                 ; :saves 0 :passes 0 :good-passes 0
-                 ; :shots 0 :shots-on-goal 0 :goals 0 :duels 0 :duels-won 0 :offsides 0 :fouls 0})
-
-    (dotimes [cnt 1000]
-      (events/duel (assoc (assoc el-classico :ball-holder
-                                             {:id 1 :name "Iker" :skill 86
-                                              :goal-keeping 96 :defense 96 :passing 96 :strength 96 :finishing 96 :attack 96 :speed 96
-                                              :saves 0 :passes 0 :good-passes 0
-                                              :shots 0 :shots-on-goal 0 :goals 0 :duels 0 :duels-won 0 :offsides 0 :fouls 0}
-                                             ) :zone :goalkeeper)))
-
-    (simulate-match el-classico)
-    ;(simulate-debug-game el-classico)
-    ))
-
-;(println (db/get-table-column "testtable" "cntVal")))
+    (simulate-match el-classico)))

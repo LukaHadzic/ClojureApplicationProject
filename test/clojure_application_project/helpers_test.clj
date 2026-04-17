@@ -492,15 +492,15 @@
        (fact "If random generated value is lower than chance that offside occurred from zone pass is sent from,
        offside occurs and true is returned."
              (with-redefs [rand (fn [] 0.3)] (helpers/offside? :goalkeeper)) => false
-             (with-redefs [rand (fn [] 0.1)] (helpers/offside? :goalkeeper)) => true
+             (with-redefs [rand (fn [] 0.01)] (helpers/offside? :goalkeeper)) => true
              (with-redefs [rand (fn [] 0.2)] (helpers/offside? :defense)) => false
-             (with-redefs [rand (fn [] 0.12)] (helpers/offside? :defense)) => true
+             (with-redefs [rand (fn [] 0.02)] (helpers/offside? :defense)) => true
              (with-redefs [rand (fn [] 0.2)] (helpers/offside? :midfield)) => false
-             (with-redefs [rand (fn [] 0.09)] (helpers/offside? :midfield)) => true
+             (with-redefs [rand (fn [] 0.01)] (helpers/offside? :midfield)) => true
              (with-redefs [rand (fn [] 0.3)] (helpers/offside? :attack)) => false
-             (with-redefs [rand (fn [] 0.1)] (helpers/offside? :attack)) => true
+             (with-redefs [rand (fn [] 0.01)] (helpers/offside? :attack)) => true
              (with-redefs [rand (fn [] 0.35)] (helpers/offside? :penalty-box)) => false
-             (with-redefs [rand (fn [] 0.25)] (helpers/offside? :penalty-box)) => true))
+             (with-redefs [rand (fn [] 0.05)] (helpers/offside? :penalty-box)) => true))
 
              (facts "Testing helpers/out? function"
        (fact "If random generated number is greater than :passing attribute of player, ball will be sent out of the pitch (returned true)."
@@ -538,15 +538,15 @@
                => false)))
 
 (facts "Testing helpers/goal? function"
-       (fact "Used to decide if goal happened or not."
+       (fact "Used to decide if taken shot was on target or not."
              (with-redefs [rand (fn [] 0.3)]
-               (helpers/goal? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86})
+               (helpers/shot-on-goal? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86})
                => true)
              (with-redefs [rand (fn [] 0.5)]
-               (helpers/goal? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86})
+               (helpers/shot-on-goal? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86})
                => true)
              (with-redefs [rand (fn [] 0.7)]
-               (helpers/goal? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86})
+               (helpers/shot-on-goal? {:id 22 :name "Neymar" :finishing 60 :technique 94 :shot-power 86})
                => false)))
 
 (facts "Testing helpers/duel-won? function"
@@ -649,7 +649,7 @@
              (helpers/inc-events mock-match-test-min-players :home 2 [:passes :duels]) =>
                                  {:home {:team {:players {:goalkeeper [{:id 1 :passes 0 :duels 0}] :defense [{:id 2 :passes 1 :duels 1} {:id 3 :passes 0 :duels 0}]}}}
                                   :away {:team {:players {:goalkeeper [{:id 12 :passes 0 :duels 0}] :defense [{:id 13 :passes 0 :duels 0} {:id 14 :passes 0 :duels 0}]}}}
-                                  :minute 0 :time 0 :possession :home :zone :defense :ball-holder {:id 2 :passes 0 :duels 0} :log {:home [] :away []}}
+                                  :minute 0 :time 0 :possession :home :zone :defense :ball-holder {:id 2 :passes 1 :duels 1} :log {:home [] :away []}}
              (helpers/inc-events mock-match-test-min-players :away 13 [:duels]) =>
              {:home {:team {:players {:goalkeeper [{:id 1 :passes 0 :duels 0}] :defense [{:id 2 :passes 0 :duels 0} {:id 3 :passes 0 :duels 0}]}}}
               :away {:team {:players {:goalkeeper [{:id 12 :passes 0 :duels 0}] :defense [{:id 13 :passes 0 :duels 1} {:id 14 :passes 0 :duels 0}]}}}
