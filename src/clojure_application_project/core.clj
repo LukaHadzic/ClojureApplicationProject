@@ -113,8 +113,8 @@
           curr-state)
         (recur (simulate-event curr-state))))))
 
-(def el-class-fin
-  (simulate-match el-classico))
+;(def el-class-fin
+;  (simulate-match el-classico))
 
 (defn -main
   "I don't do a whole lot ... yet."
