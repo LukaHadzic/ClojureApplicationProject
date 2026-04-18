@@ -624,19 +624,49 @@
   (let [n (- (/ string-length 2) 2)]
     (apply str (repeat (max 0 n) " "))))
 
+;U startu je 16
+;Ako je naziv veci, npr. 20 -> onda se dopunjuje manje
+
+(defn padd-with-spaces-heading
+  [string-length]
+  (let [n (- (/ string-length 2) 2)]
+    (apply str (repeat (max 0 n) " "))))
+
 (defn show-match-end
   [state]
   (let [home (get-in state [:home])
         away (get-in state [:away])
-        home-name-length (count (:name (:team home)))]
+        home-name-length (min (count (:name (:team home))) 20)
+        away-name-length (min (count (:name (:team away))) 20)
+        home-shots (count-event state :home :shots)
+        away-shots (count-event state :away :shots)
+        home-shots-target (count-event state :home :shots-on-goal)
+        away-shots-target (count-event state :away :shots-on-goal)
+        home-passes (count-event state :home :passes)
+        away-passes (count-event state :away :passes)
+        home-good-passes(count-event state :home :good-passes)
+        away-good-passes (count-event state :away :good-passes)
+        home-duels (count-event state :home :duels)
+        away-duels (count-event state :away :duels)
+        home-duels-won (count-event state :home :duels-won)
+        away-duels-won (count-event state :away :duels-won)
+        home-shot-acc  (quot (* home-shots-target 100) home-shots)
+        away-shot-acc (quot (* away-shots-target 100) away-shots)
+        home-pass-acc (quot (* home-good-passes 100) home-passes)
+        away-pass-acc (quot (* away-good-passes 100) away-passes)
+        home-duels-acc (quot (* home-duels-won 100) home-duels)
+        away-duels-acc (- 100 home-duels-acc)]
 
-    (println "\n==============================")
-    (println "        MATCH FINISHED       ")
-    (println "==============================\n")
 
-    (println (format "%s        :        %-15s"
+    (println "\n=====================================")
+    (println "            MATCH FINISHED            ")
+    (println "=====================================\n")
+
+    (println (format "%s%s:%s%s"
                      (max-20-chars (:name (:team home)))
-                     (:name (:team away))))
+                     (padd-with-spaces (- 32 home-name-length))
+                     (padd-with-spaces (- 30 away-name-length))
+                     (max-20-chars (:name (:team away)))))
 
     (println (format "%s%4d          Goals        %4d"
                      (padd-with-spaces home-name-length)
@@ -645,23 +675,38 @@
 
     (println (format "%s%4d          Shots        %4d"
                      (padd-with-spaces home-name-length)
-                     (count-event state :home :shots)
-                     (count-event state :away :shots)))
+                     home-shots
+                     away-shots))
 
     (println (format "%s%4d     Shots on target   %4d"
                      (padd-with-spaces home-name-length)
-                     (count-event state :home :shots-on-goal)
-                     (count-event state :away :shots-on-goal)))
+                     home-shots-target
+                     away-shots-target))
+
+    (println (format "%s%3d%%      Shot accuracy    %3d%%"
+                     (padd-with-spaces home-name-length)
+                     home-shot-acc
+                     away-shot-acc))
+
+    (println (format "%s%4d          Saves        %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :saves)
+                     (count-event state :away :saves)))
 
     (println (format "%s%4d          Passes       %4d"
                      (padd-with-spaces home-name-length)
-                     (count-event state :home :passes)
-                     (count-event state :away :passes)))
+                     home-passes
+                     away-passes))
 
     (println (format "%s%4d       Good passes     %4d"
                      (padd-with-spaces home-name-length)
-                     (count-event state :home :good-passes)
-                     (count-event state :away :good-passes)))
+                     home-good-passes
+                     away-good-passes))
+
+    (println (format "%s%3d%%      Pass accuracy    %3d%%"
+                     (padd-with-spaces home-name-length)
+                     home-pass-acc
+                     away-pass-acc))
 
     (println (format "%s%4d         Offsides      %4d"
                      (padd-with-spaces home-name-length)
@@ -670,13 +715,18 @@
 
     (println (format "%s%4d          Duels        %4d"
                      (padd-with-spaces home-name-length)
-                     (count-event state :home :duels)
-                     (count-event state :away :duels)))
+                     home-duels
+                     away-duels))
 
     (println (format "%s%4d        Duels won      %4d"
                      (padd-with-spaces home-name-length)
-                     (count-event state :home :duels-won)
-                     (count-event state :away :duels-won)))
+                     home-duels-won
+                     away-duels-won))
+
+    (println (format "%s%3d%%      Duel win rate   %4d%%"
+                     (padd-with-spaces home-name-length)
+                     home-duels-acc
+                     away-duels-acc))
 
     (println (format "%s%4d        Driblings      %4d"
                      (padd-with-spaces home-name-length)
@@ -696,6 +746,4 @@
     (println (format "%s%4d        Red cards      %4d"
                      (padd-with-spaces home-name-length)
                      (count-event state :home :red-card)
-                     (count-event state :away :red-card)))
-
-    (println "    ______________________________\n")))
+                     (count-event state :away :red-card)))))

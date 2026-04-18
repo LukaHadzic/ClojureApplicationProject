@@ -39,7 +39,7 @@
                                  (helpers/make-player 11 "Gareth Bale"
                                                       91 10 60 82 90 10 10 84 88 90 80 94 82)]})
 
-    (helpers/make-team "Barcelona"
+    (helpers/make-team "FC Barcelona"
                        {:goalkeeper [(helpers/make-player 12 "Victor Valdes"
                                                           87 94 40 55 20 90 92 88 30 40 60 55 60)]
 
