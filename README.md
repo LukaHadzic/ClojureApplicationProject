@@ -12,3 +12,37 @@ Players have various of attributes that represent how well they do certain thing
 Simulation can be easily upgraded by adding various how phisical but also mental/character attributes that will have their role in the game logic (f.e. higher the :aggressivity attribute, higher the chance for foul is).
 
 At the end of simulation, all data required for match statistics are available to be calculated. Also, players have their own statistical attributes that are being updated during simulation in order to calculate and track players stats through matches.
+
+# Start simulation
+
+In order to evaluate project and start simulation, You need to have Leiningen installed on Your machine. More instructions are provided on following website: https://leiningen.org/
+
+## Project.clj
+Here is project.clj file that contains all information needed for evaluating project. Simulation works without ```[com.github.seancorfield/next.jdbc&nbsp;"1.3.894"]``` and ```[com.mysql/mysql-connector-j "9.5.0"]``` dependencies because they are not used yet - will be used in my upcoming, bigger project. Same goes for db and statistics namespaces. 
+
+```markdown
+(defproject clojure-application-project "0.1.0-SNAPSHOT"
+  :description "Football match simulation in Clojure"
+  :url "https://github.com/LukaHadzic/ClojureApplicationProject"
+  :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
+            :url "https://www.eclipse.org/legal/epl-2.0/"}
+  :dependencies [[org.clojure/clojure "1.12.2"]
+                 [midje "1.10.10"]
+                 [com.github.seancorfield/next.jdbc "1.3.894"]
+                 [com.mysql/mysql-connector-j "9.5.0"]]
+  :plugins [[lein-midje "3.2.2"]]
+  :main ^:skip-aot clojure-application-project.core
+  :target-path "target/%s"
+  :profiles {:uberjar {:aot :all
+                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}})
+```
+
+## Leiningen
+To run simulation just run following command in terminal:
+```markdown
+lein run # Run simulation 
+```
+To run project's tests just run following command in terminal:
+```markdown
+lein midje # Run tests 
+```
