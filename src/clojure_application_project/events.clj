@@ -14,11 +14,12 @@
 (defn finish-shot
   [state event]
   (let [team (:possession state)
-        new-possession (helpers/opposite-team team)]
+        new-possession (helpers/opposite-team team)
+        ball-holder-id (:id (:ball-holder state))]
     (if (= event :goal)
       (let [updated-ball-holder (helpers/new-ball-holder-resume-game state new-possession :attack)]
         (-> state
-            (update-shot 1)
+            (helpers/inc-events team ball-holder-id [:shots :shots-on-goal :goals])
             (update-in [:log team] conj event)
             (update-in [:log new-possession] conj :conceded-goal)
             (update-in [team :goals] + 1)
@@ -28,7 +29,7 @@
             (assoc :possession new-possession)))
       (let [updated-ball-holder (first (get-in state [new-possession :team :players :goalkeeper]))]
           (-> state
-            (update-shot 0)
+            (helpers/inc-events team ball-holder-id [:shots])
             (update-in [:log team] conj :miss)
             (update-in [:log new-possession] conj :shot-ball-won)
             (assoc :zone :goalkeeper)
@@ -367,21 +368,19 @@
     (if (= card :red)
       (if (= (get player :yellow-cards) 1)
         (-> state
-            (helpers/inc-events team player-id [:yellow-cards])
-            (helpers/inc-events team player-id [:red-card])
+            (helpers/inc-events team player-id [:duels :yellow-cards :red-card])
             (update-in [:log team] conj :yellow-card)
             (update-in [:log team] conj :red-card)
             (kick-player team player-id))
         (-> state
-            (helpers/inc-events team player-id [:red-card])
+            (helpers/inc-events team player-id [:duels :red-card])
             (update-in [:log team] conj :red-card)
             (kick-player team player-id)))
       ;(if (and (> (rand) 0.01) (< (rand) 0.15))
       (if (= card :yellow)
         (if (= (get player :yellow-cards) 1)
           (-> state
-              (helpers/inc-events team player-id [:yellow-cards])
-              (helpers/inc-events team player-id [:red-card])
+              (helpers/inc-events team player-id [:duels :yellow-cards :red-card])
               (update-in [:log team] conj :yellow-card)
               (update-in [:log team] conj :red-card)
               (kick-player team player-id))

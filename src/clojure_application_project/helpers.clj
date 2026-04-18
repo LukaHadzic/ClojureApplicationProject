@@ -27,19 +27,19 @@
                           :defense (count (get players-and-positions :defense))
                           :midfield (count (get players-and-positions :midfield))
                           :attack (count (get players-and-positions :attack))}
-   :players players-and-positions :kicked-players {}})
+   :players players-and-positions :kicked-players []})
 
 (defn make-match
   [home away]
-  (let [state {:home {:team home :goals 0}
-               :away {:team away :goals 0}
-               :minute 0
-               :time 0
-               :possession :home
-               :zone :midfield ;PROMENJENO UMESTO :attack da bude :midfield
-               :phase :resume
+  (let [state {:home        {:team home :goals 0}
+               :away        {:team away :goals 0}
+               :minute      0
+               :time        0
+               :possession  :home
+               :zone        :midfield ;PROMENJENO UMESTO :attack da bude :midfield
+               :phase       :resume
                :ball-holder {}
-               :log {:home [] :away []}}
+               :log         {:home [] :away []}}
         state (assoc state :ball-holder (rand-nth (get-in state [(:possession state) :team :players :attack])))]
     state))
 
@@ -609,107 +609,93 @@
         kicked (get-in state [team :team :kicked-players])
         all (if (nil? (first kicked))
               players
-              (concat players [kicked]))]
+              (concat players kicked))]
     (reduce + (map event all))))
-;(helpers/count-duels {:team {:name "Barcelona",
-;                             :players {:goalkeeper [{:good-passes 0,
-;                                                     :skill 87,
-;                                                     :goals 0,
-;                                                     :duels-won 0,
-;                                                     :name "Victor Valdes",
-;                                                     :passes 0,
-;                                                     :shots 0,
-;                                                     :id 12,
-;                                                     :duels 0}],
-;                                       :defense [{:good-passes 1,
-;                                                  :skill 85,
-;                                                  :goals 0,
-;                                                  :duels-won 0,
-;                                                  :name "Dani Alves",
-;                                                  :passes 1,
-;                                                  :shots 0,
-;                                                  :id 13,
-;                                                  :duels 3}
-;                                                 {:good-passes 1,
-;                                                  :skill 87,
-;                                                  :goals 0,
-;                                                  :duels-won 0,
-;                                                  :name "Gerard Pique",
-;                                                  :passes 1,
-;                                                  :shots 0,
-;                                                  :id 14,
-;                                                  :duels 2}
-;                                                 {:good-passes 0,
-;                                                  :skill 85,
-;                                                  :goals 0,
-;                                                  :duels-won 0,
-;                                                  :name "Javier Mascherano",
-;                                                  :passes 0,
-;                                                  :shots 0,
-;                                                  :id 15,
-;                                                  :duels 1}
-;                                                 {:good-passes 1,
-;                                                  :skill 83,
-;                                                  :goals 0,
-;                                                  :duels-won 0,
-;                                                  :name "Jordi Alba",
-;                                                  :passes 2,
-;                                                  :shots 0,
-;                                                  :id 16,
-;                                                  :duels 0}],
-;                                       :midfield [{:good-passes 0,
-;                                                   :skill 87,
-;                                                   :goals 0,
-;                                                   :duels-won 2,
-;                                                   :name "Sergio Busquets",
-;                                                   :passes 0,
-;                                                   :shots 0,
-;                                                   :id 17,
-;                                                   :duels 3}
-;                                                  {:good-passes 2,
-;                                                   :skill 90,
-;                                                   :goals 0,
-;                                                   :duels-won 4,
-;                                                   :name "Xavi",
-;                                                   :passes 2,
-;                                                   :shots 0,
-;                                                   :id 18,
-;                                                   :duels 4}
-;                                                  {:good-passes 1,
-;                                                   :skill 91,
-;                                                   :goals 0,
-;                                                   :duels-won 0,
-;                                                   :name "Andres Iniesta",
-;                                                   :passes 2,
-;                                                   :shots 0,
-;                                                   :id 19,
-;                                                   :duels 0}],
-;                                       :attack [{:good-passes 0,
-;                                                 :skill 94,
-;                                                 :goals 1,
-;                                                 :duels-won 1,
-;                                                 :name "Lionel Messi",
-;                                                 :passes 0,
-;                                                 :shots 1,
-;                                                 :id 20,
-;                                                 :duels 1}
-;                                                {:good-passes 0,
-;                                                 :skill 85,
-;                                                 :goals 1,
-;                                                 :duels-won 0,
-;                                                 :name "Pedro",
-;                                                 :passes 0,
-;                                                 :shots 1,
-;                                                 :id 21,
-;                                                 :duels 0}
-;                                                {:good-passes 0,
-;                                                 :skill 87,
-;                                                 :goals 1,
-;                                                 :duels-won 1,
-;                                                 :name "Neymar",
-;                                                 :passes 0,
-;                                                 :shots 1,
-;                                                 :id 22,
-;                                                 :duels 1}]
-;                                       }},
-;                      :goals 3})
+
+(defn max-20-chars
+  [some-string]
+  (let [some-string-1 (str some-string)]
+    (if (> (count some-string-1) 20)
+      (subs some-string-1 0 20)
+      some-string-1)))
+
+(defn padd-with-spaces
+  [string-length]
+  (let [n (- (/ string-length 2) 2)]
+    (apply str (repeat (max 0 n) " "))))
+
+(defn show-match-end
+  [state]
+  (let [home (get-in state [:home])
+        away (get-in state [:away])
+        home-name-length (count (:name (:team home)))]
+
+    (println "\n==============================")
+    (println "        MATCH FINISHED       ")
+    (println "==============================\n")
+
+    (println (format "%s        :        %-15s"
+                     (max-20-chars (:name (:team home)))
+                     (:name (:team away))))
+
+    (println (format "%s%4d          Goals        %4d"
+                     (padd-with-spaces home-name-length)
+                     (:goals home)
+                     (:goals away)))
+
+    (println (format "%s%4d          Shots        %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :shots)
+                     (count-event state :away :shots)))
+
+    (println (format "%s%4d     Shots on target   %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :shots-on-goal)
+                     (count-event state :away :shots-on-goal)))
+
+    (println (format "%s%4d          Passes       %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :passes)
+                     (count-event state :away :passes)))
+
+    (println (format "%s%4d       Good passes     %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :good-passes)
+                     (count-event state :away :good-passes)))
+
+    (println (format "%s%4d         Offsides      %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :offsides)
+                     (count-event state :away :offsides)))
+
+    (println (format "%s%4d          Duels        %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :duels)
+                     (count-event state :away :duels)))
+
+    (println (format "%s%4d        Duels won      %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :duels-won)
+                     (count-event state :away :duels-won)))
+
+    (println (format "%s%4d        Driblings      %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :crosses)
+                     (count-event state :away :crosses)))
+
+    (println (format "%s%4d          Fouls        %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :fouls)
+                     (count-event state :away :fouls)))
+
+    (println (format "%s%4d       Yellow cards    %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :yellow-cards)
+                     (count-event state :away :yellow-cards)))
+
+    (println (format "%s%4d        Red cards      %4d"
+                     (padd-with-spaces home-name-length)
+                     (count-event state :home :red-card)
+                     (count-event state :away :red-card)))
+
+    (println "    ______________________________\n")))

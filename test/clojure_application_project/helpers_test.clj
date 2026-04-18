@@ -40,7 +40,7 @@
                         :defense [{:b "b"} {:b "b"} {:b "b"} {:b "b"}]
                         :midfield [{:c "c"} {:c "c"} {:c "c"}]
                         :attack [{:d "d"} {:d "d"} {:d "d"}]}
-              :kicked-players {}}))
+              :kicked-players []}))
 
 (def mock-match-test
   {:home {:team {:name "Barcelona"
@@ -49,7 +49,7 @@
                            :defense [{:id 2 :b "b"} {:id 3 :b "b"} {:id 4 :b "b"} {:id 5 :b "b"}]
                            :midfield [{:id 6 :c "c"} {:id 7 :c "c"} {:id 8 :c "c"}]
                            :attack [{:id 9 :e "e"} {:id 10 :f "f"} {:id 11 :g "g"}]}
-                 :kicked-players {}}
+                 :kicked-players []}
           :goals 0}
    :away {:team {:name "Real Madrid"
                  :formation {:goalkeeper 1 :defense 4 :midfield 3 :attack 3}
@@ -57,7 +57,7 @@
                   :defense [{:id 13 :b "b"} {:id 14 :b "b"} {:id 15 :b "b"} {:id 16 :b "b"}]
                   :midfield [{:id 17 :c "c"} {:id 18 :c "c"} {:id 19 :c "c"}]
                   :attack [{:id 20 :d "d"} {:id 21 :d "d"} {:id 22 :d "d"}]}
-                 :kicked-players {}}
+                 :kicked-players []}
           :goals 0}
    :minute 0
    :time 0
@@ -156,7 +156,7 @@
                                       :defense [{:b "b"} {:b "b"} {:b "b"} {:b "b"}]
                                       :midfield [{:c "c"} {:c "c"} {:c "c"}]
                                       :attack [{:e "e"} {:f "f"} {:g "g"}]}
-                            :kicked-players {}}
+                            :kicked-players []}
                      :goals 0}
               :away {:team {:name "Real Madrid"
                             :formation {:goalkeeper 1 :defense 4 :midfield 3 :attack 3}
@@ -164,7 +164,7 @@
                                       :defense [{:b "b"} {:b "b"} {:b "b"} {:b "b"}]
                                       :midfield [{:c "c"} {:c "c"} {:c "c"}]
                                       :attack [{:d "d"} {:d "d"} {:d "d"}]}
-                            :kicked-players {}}
+                            :kicked-players []}
                      :goals 0}
               :minute 0
               :time 0
@@ -705,3 +705,57 @@
           (helpers/cross-next-zone? ; -0.4 -> 0.3
             {:id 22 :name "Neymar" :strength 90 :speed 65 :technique 94}
             {:id 4 :name "Ramos" :strength 78 :speed 85 :technique 70}) => false)))
+
+
+(facts "Testing helpers/count-event function - For provided event keyword, this function counts how many times that
+event happened, including events in kicked players."
+       (fact "Provided event is :duel - no kicked players"
+             (helpers/count-event (-> mock-match-test-min-players
+                                      (assoc-in [:home :team :players :goalkeeper 0 :duels] 1)
+                                      (assoc-in [:home :team :players :defense 0 :duels] 10)
+                                      (assoc-in [:home :team :players :defense 1 :duels] 3)) :home :duels)
+             => 14)
+
+       (fact "Provided event is :passes - no kicked players"
+             (helpers/count-event (-> mock-match-test-min-players
+                                      (assoc-in [:home :team :players :defense 0 :passes] 1)
+                                      (assoc-in [:home :team :players :defense 0 :duels] 3)
+                                      (assoc-in [:home :team :players :defense 1 :passes] 5)) :home :passes)
+             => 6)
+
+       (fact "Provided event is :duel - there is kicked players"
+             (helpers/count-event (-> mock-match-test-min-players
+                                      (assoc-in [:home :team :players :goalkeeper 0 :duels] 1)
+                                      (assoc-in [:home :team :players :defense 0 :duels] 10)
+                                      (update-in [:home :team :kicked-players] conj {:id 4 :passes 1 :duels 2})
+                                      (assoc-in [:home :team :players :defense 1 :duels] 3)) :home :duels)
+             => 16)
+
+       (fact "Provided event is :passes - there is kicked players"
+             (helpers/count-event (-> mock-match-test-min-players
+                                      (assoc-in [:home :team :players :goalkeeper 0 :passes] 1)
+                                      (assoc-in [:home :team :players :defense 0 :passes] 10)
+                                      (update-in [:home :team :kicked-players] conj {:id 4 :passes 1 :duels 2})
+                                      (update-in [:home :team :kicked-players] conj {:id 5 :passes 11 :duels 0})
+                                      (update-in [:home :team :kicked-players] conj {:id 6 :passes 0 :duels 0})
+                                      (assoc-in [:home :team :players :defense 1 :passes] 3)) :home :passes)
+             => 26))
+
+(facts "Testing helpers/max-20-chars - Used to trim down strings longer than 20 chars to exactly 20 chars.
+Strings with less than 20 chars are not affected."
+       (fact "Provided string is 15 chars long - nothing should happen"
+             (helpers/max-20-chars "0123456789abcde") => "0123456789abcde")
+       (fact "Provided string is 20 chars long - nothing should happen"
+             (helpers/max-20-chars "0123456789abcdefghij") => "0123456789abcdefghij")
+       (fact "Provided string is 23 chars long - should be trimmed to 20 chars"
+             (helpers/max-20-chars "0123456789abcdefghijklm") => "0123456789abcdefghij"))
+
+
+(facts "Testing helpers/padd-with-spaces function. This function should return string contained as much blank spaces as
+provided number divided by 2 and then subtracted by 2"
+       (fact "Provided number is 10 and string should be 3 blank spaces"
+             (helpers/padd-with-spaces 10) => "   ")
+       (fact "Provided number is 11 and string should be 3 blank spaces"
+             (helpers/padd-with-spaces 11) => "   ")
+       (fact "Provided number is 12 and string should be 4 blank spaces"
+             (helpers/padd-with-spaces 12) => "    "))

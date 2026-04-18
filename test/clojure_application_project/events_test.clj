@@ -586,7 +586,7 @@ chance for offside to happen."
        (fact "Player got red card. If player didn't have any yellow cards, only :red-card is updated and function calls
        events/kick-player function to kick player.If player had one yellow card, :yellow-cards :red-card are updated, and
        function calls events/kick-player function to kick player."
-             (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :yellow-cards 0 :red-card 0) :away {:id 22 :name "Neymar" :yellow-cards 0 :red-card 0} :red)
+             (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :duels 0 :yellow-cards 0 :red-card 0) :away {:id 22 :name "Neymar" :duels 0 :yellow-cards 0 :red-card 0} :red)
              =>
              {:home {:team
                        {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
@@ -596,14 +596,14 @@ chance for offside to happen."
                                   :defense []
                                   :midfield []
                                   :attack []}
-                        :kicked-players '({:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :yellow-cards 0 :red-card 1})} :goals 0}
+                        :kicked-players '({:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :duels 1 :yellow-cards 0 :red-card 1})} :goals 0}
                 :possession :home
                 :zone :attack
                 :phase :attack
                 :ball-holder {:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}
                 :log {:home [] :away [:red-card]}}
 
-             (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :yellow-cards 1 :red-card 0) :away {:id 22 :name "Neymar" :yellow-cards 1 :red-card 0} :red)
+             (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :duels 0 :yellow-cards 1 :red-card 0) :away {:id 22 :name "Neymar" :duels 0 :yellow-cards 1 :red-card 0} :red)
              =>
              {:home {:team
                      {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
@@ -613,7 +613,7 @@ chance for offside to happen."
                                 :defense []
                                 :midfield []
                                 :attack []}
-                      :kicked-players '({:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :yellow-cards 2 :red-card 1})} :goals 0}
+                      :kicked-players '({:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :duels 1 :yellow-cards 2 :red-card 1})} :goals 0}
               :possession :home
               :zone :attack
               :phase :attack
@@ -637,7 +637,7 @@ chance for offside to happen."
 
        (fact "If player had one yellow card, and got another one, :yellow-cards and :red-card are updated and function
        calls events/kick player to kick player. :ball-holder map isn't updated - doesn't affect simulation."
-             (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :yellow-cards 1 :red-card 0) :away {:id 22 :name "Neymar" :yellow-cards 1 :red-card 0} :yellow)
+             (events/get-card (update-in mock-match-finish-shot [:away :team :players :attack 0] assoc :duels 0 :yellow-cards 1 :red-card 0) :away {:id 22 :name "Neymar" :duels 0 :yellow-cards 1 :red-card 0} :yellow)
              =>
              {:home {:team
                      {:name "Real madrid" :players {:attack [{:id 11 :name "Gareth Bale" :goals 0 :shots 0 :shots-on-goal 0}]}} :goals 0}
@@ -647,7 +647,7 @@ chance for offside to happen."
                                 :defense []
                                 :midfield []
                                 :attack []}
-                      :kicked-players '({:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :yellow-cards 2 :red-card 1})} :goals 0}
+                      :kicked-players '({:id 22 :name "Neymar" :goals 0 :shots 0 :shots-on-goal 0 :duels 1 :yellow-cards 2 :red-card 1})} :goals 0}
               :possession :home
               :zone :attack
               :phase :attack
