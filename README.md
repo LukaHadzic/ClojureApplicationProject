@@ -18,7 +18,7 @@ At the end of simulation, all data required for match statistics are available t
 In order to evaluate project and start simulation, You need to have Leiningen installed on Your machine. More instructions are provided on following website: https://leiningen.org/
 
 ## Project.clj
-Here is project.clj file that contains all information needed for evaluating project. Simulation works without ```[com.github.seancorfield/next.jdbc&nbsp;"1.3.894"]``` and ```[com.mysql/mysql-connector-j "9.5.0"]``` dependencies because they are not used yet - will be used in my upcoming, bigger project. Same goes for db and statistics namespaces. 
+Here is project.clj file that contains all information needed for evaluating project. Simulation works without ```[com.github.seancorfield/next.jdbc "1.3.894"]``` and ```[com.mysql/mysql-connector-j "9.5.0"]``` dependencies because they are not used yet - will be used in my upcoming, bigger project. Same goes for db and statistics namespaces. 
 
 ```markdown
 (defproject clojure-application-project "0.1.0-SNAPSHOT"
